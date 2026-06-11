@@ -1,8 +1,10 @@
-# FoodDash 🍔
+FoodDash 🍔
 
-A full-stack food delivery platform built with a **production-grade microservices architecture** — similar to Uber Eats or DoorDash.
+A full-stack food delivery platform built with a production-grade microservices architecture, inspired by platforms like Uber Eats and DoorDash.
 
-> This is a learning project designed to go from zero to a fully working multi-service platform. Each phase builds on the last, introducing real-world backend engineering patterns.
+FoodDash demonstrates how a scalable, real-world food delivery system can be structured using modern backend and frontend technologies, with a focus on modular services, clean architecture, and maintainability.
+
+The project is designed as a complete end-to-end system, covering core flows such as user management, restaurant listings, order processing, and delivery tracking across independent services.
 
 ---
 
