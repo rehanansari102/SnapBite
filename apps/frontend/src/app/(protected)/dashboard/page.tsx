@@ -2,7 +2,7 @@ import { cookies } from 'next/headers'
 import Link from 'next/link'
 import EmailVerificationBanner from '@/components/auth/EmailVerificationBanner'
 
-export const metadata = { title: 'Dashboard — FoodDash' }
+export const metadata = { title: 'Dashboard — SnapBite' }
 
 function decodeJwtPayload(token: string): Record<string, unknown> {
   try {
@@ -65,7 +65,20 @@ export default async function DashboardPage() {
             <span className="text-3xl">🏪</span>
             <div>
               <p className="font-bold text-lg text-gray-900">My Restaurants</p>
-              <p className="text-gray-400 text-sm">Manage menus & orders</p>
+              <p className="text-gray-400 text-sm">Manage menus & hours</p>
+            </div>
+            <span className="ml-auto text-2xl text-gray-300">→</span>
+          </Link>
+        )}
+        {isOwner && (
+          <Link
+            href="/dashboard/orders"
+            className="flex items-center gap-4 bg-white hover:border-orange-200 hover:shadow-md border border-gray-200 rounded-2xl p-5 transition-all duration-200"
+          >
+            <span className="text-3xl">📋</span>
+            <div>
+              <p className="font-bold text-lg text-gray-900">Incoming Orders</p>
+              <p className="text-gray-400 text-sm">Review & update order status</p>
             </div>
             <span className="ml-auto text-2xl text-gray-300">→</span>
           </Link>

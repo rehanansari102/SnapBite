@@ -1,4 +1,4 @@
-# FoodDash 🍔
+# SnapBite 🍔
 
 A full-stack food delivery platform built with a **production-grade microservices architecture** — similar to Uber Eats or DoorDash.
 
@@ -48,7 +48,7 @@ Real-time:          NestJS WebSocket Gateway
 ## Project Structure
 
 ```
-FoodDash/
+SnapBite/
 ├── apps/
 │   ├── api-gateway/        # Single entry point, JWT guard, reverse proxy
 │   ├── auth-service/       # Register, login, refresh, forgot/reset password, email verification
@@ -79,8 +79,8 @@ FoodDash/
 
 ```bash
 # Clone the repo
-git clone https://github.com/your-username/FoodDash.git
-cd FoodDash
+git clone https://github.com/your-username/SnapBite.git
+cd SnapBite
 
 # Copy and fill in env files
 cp apps/auth-service/.env.example apps/auth-service/.env
@@ -108,7 +108,7 @@ PORT=3001
 GRPC_PORT=50051
 NODE_ENV=development
 
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/fooddash_auth
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/snapbite_auth
 REDIS_URL=redis://localhost:6379
 
 JWT_SECRET=change-me-in-production
@@ -161,13 +161,13 @@ APP_URL=http://localhost:3010
 pnpm install
 
 # Run auth-service in watch mode
-pnpm --filter @food-dash/auth-service run start:dev
+pnpm --filter @snapbite/auth-service run start:dev
 ```
 
 ### Run tests
 
 ```bash
-pnpm --filter @food-dash/auth-service run test
+pnpm --filter @snapbite/auth-service run test
 ```
 
 ---

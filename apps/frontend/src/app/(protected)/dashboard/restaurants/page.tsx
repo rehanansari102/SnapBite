@@ -2,7 +2,7 @@ import { cookies } from 'next/headers'
 import Link from 'next/link'
 import { apiGetMyRestaurants } from '@/app/lib/api'
 
-export const metadata = { title: 'My Restaurants — FoodDash' }
+export const metadata = { title: 'My Restaurants — SnapBite' }
 
 export default async function MyRestaurantsPage() {
   const token = (await cookies()).get('access_token')?.value ?? ''

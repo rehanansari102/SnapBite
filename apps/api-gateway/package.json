@@ -1,5 +1,5 @@
 {
-  "name": "@food-dash/api-gateway",
+  "name": "@snapbite/api-gateway",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -10,8 +10,8 @@
     "test:cov": "jest --coverage"
   },
   "dependencies": {
-    "@food-dash/common-guards": "1.0.0",
-    "@food-dash/proto": "1.0.0",
+    "@snapbite/common-guards": "workspace:*",
+    "@snapbite/proto": "workspace:*",
     "@grpc/grpc-js": "^1.11.1",
     "@grpc/proto-loader": "^0.7.13",
     "@nestjs/common": "^11.0.0",

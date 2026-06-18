@@ -25,18 +25,17 @@ export class UserService {
     const cached = await this.redisService.get(cacheKey);
     if (cached) return JSON.parse(cached) as UserProfile;
 
-    const found = await this.profileModel.findOne({ userId }).lean();
-    let profile: UserProfile;
-    if (!found) {
-      // Auto-create profile on first access (user registered in auth-service)
-      const created = await this.profileModel.create({ userId, email });
-      profile = created.toObject() as unknown as UserProfile;
-    } else {
-      profile = found as unknown as UserProfile;
-    }
+    // Atomic upsert — avoids race condition between findOne + create
+    const profile = await this.profileModel
+      .findOneAndUpdate(
+        { userId },
+        { $setOnInsert: { userId, email } },
+        { upsert: true, new: true, lean: true },
+      )
+      .exec();
 
     await this.redisService.set(cacheKey, JSON.stringify(profile), this.cacheTtl);
-    return profile;
+    return profile as unknown as UserProfile;
   }
 
   async updateProfile(userId: string, dto: UpdateProfileDto): Promise<UserProfile> {

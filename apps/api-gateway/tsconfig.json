@@ -4,7 +4,7 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "paths": {
-      "@food-dash/common-guards": ["../../packages/common-guards/src"],
+      "@snapbite/common-guards": ["../../packages/common-guards/src"],
     }
   },
   "include": ["src/**/*"],

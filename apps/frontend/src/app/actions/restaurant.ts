@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { apiGetAllRestaurants, apiGetNearbyRestaurants } from '@/app/lib/api'
 import {
   apiCreateRestaurant,
   apiUpdateRestaurant,
@@ -17,6 +18,16 @@ import {
 import { getAccessToken } from '@/app/lib/cookies'
 
 export type ActionState = { message?: string; success?: boolean; data?: unknown } | undefined
+
+// ── Browse ────────────────────────────────────────────────────────────────────
+
+export async function getAllRestaurants() {
+  return apiGetAllRestaurants()
+}
+
+export async function getNearbyRestaurants(lat: number, lng: number, radius = 20) {
+  return apiGetNearbyRestaurants(lat, lng, radius)
+}
 
 // ── Restaurant ────────────────────────────────────────────────────────────────
 

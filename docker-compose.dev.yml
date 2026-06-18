@@ -1,0 +1,98 @@
+name: snapbite
+
+# ─────────────────────────────────────────────────────────────
+#  Local development — infrastructure only
+#  App services run locally via: pnpm dev
+#  Usage: docker-compose -f docker-compose.dev.yml up -d
+#         (shortcut: pnpm infra:up)
+#  UI tools:
+#    Redis Commander: http://localhost:8081
+#    Mongo Express:   http://localhost:8082
+# ─────────────────────────────────────────────────────────────
+
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: fd-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_MULTIPLE_DATABASES: snapbite_auth,snapbite_payments
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/create-multiple-pg-databases.sh:/docker-entrypoint-initdb.d/create-dbs.sh
+    ports:
+      - '5432:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongodb:
+    image: mongo:7
+    container_name: fd-mongodb
+    restart: unless-stopped
+    command: mongod --replSet rs0 --bind_ip_all
+    volumes:
+      - mongo_data:/data/db
+    ports:
+      - '27018:27017'
+    healthcheck:
+      test: ['CMD', 'mongosh', '--quiet', '--eval', "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  mongo-init:
+    image: mongo:7
+    container_name: fd-mongo-init
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    restart: 'no'
+    entrypoint: >
+      mongosh --host mongodb:27017
+        --eval "try { rs.status() } catch(e) { rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'mongodb:27017' }] }) }"
+
+  redis:
+    image: redis:7-alpine
+    container_name: fd-redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: fd-redis-commander
+    restart: unless-stopped
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    ports:
+      - '8081:8081'
+    depends_on:
+      - redis
+
+  mongo-express:
+    image: mongo-express:latest
+    container_name: fd-mongo-express
+    restart: unless-stopped
+    environment:
+      ME_CONFIG_MONGODB_URL: mongodb://mongodb:27017/
+      ME_CONFIG_BASICAUTH: 'false'
+    ports:
+      - '8082:8081'
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  mongo_data:

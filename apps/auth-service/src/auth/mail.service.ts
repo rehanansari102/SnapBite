@@ -11,7 +11,7 @@ export class MailService {
   private readonly logger = new Logger(MailService.name);
   private readonly apiInstance: TransactionalEmailsApi;
   private readonly fromEmail: string;
-  private readonly fromName = 'FoodDash';
+  private readonly fromName = 'SnapBite';
 
   constructor(private configService: ConfigService) {
     this.apiInstance = new TransactionalEmailsApi();
@@ -27,16 +27,16 @@ export class MailService {
 
     email.sender = { name: this.fromName, email: this.fromEmail };
     email.to = [{ email: toEmail }];
-    email.subject = 'Reset your FoodDash password';
+    email.subject = 'Reset your SnapBite password';
     email.htmlContent = `
       <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px; background: #fff;">
         <div style="text-align: center; margin-bottom: 32px;">
           <span style="font-size: 48px;">🍔</span>
-          <h1 style="color: #f97316; margin: 8px 0 0;">FoodDash</h1>
+          <h1 style="color: #f97316; margin: 8px 0 0;">SnapBite</h1>
         </div>
         <h2 style="color: #111827; margin-bottom: 8px;">Reset your password</h2>
         <p style="color: #6b7280; margin-bottom: 24px; line-height: 1.6;">
-          We received a request to reset your FoodDash password.
+          We received a request to reset your SnapBite password.
           Click the button below to choose a new one.
         </p>
         <a href="${resetLink}"
@@ -50,7 +50,7 @@ export class MailService {
         </p>
         <hr style="border: none; border-top: 1px solid #f3f4f6; margin: 24px 0;" />
         <p style="color: #d1d5db; font-size: 12px; text-align: center;">
-          © ${new Date().getFullYear()} FoodDash. All rights reserved.
+          © ${new Date().getFullYear()} SnapBite. All rights reserved.
         </p>
       </div>
     `;
@@ -69,12 +69,12 @@ export class MailService {
 
     email.sender = { name: this.fromName, email: this.fromEmail };
     email.to = [{ email: toEmail }];
-    email.subject = 'Verify your FoodDash email';
+    email.subject = 'Verify your SnapBite email';
     email.htmlContent = `
       <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px; background: #fff;">
         <div style="text-align: center; margin-bottom: 32px;">
           <span style="font-size: 48px;">🍔</span>
-          <h1 style="color: #f97316; margin: 8px 0 0;">FoodDash</h1>
+          <h1 style="color: #f97316; margin: 8px 0 0;">SnapBite</h1>
         </div>
         <h2 style="color: #111827; margin-bottom: 8px;">Verify your email address</h2>
         <p style="color: #6b7280; margin-bottom: 24px; line-height: 1.6;">
@@ -87,12 +87,12 @@ export class MailService {
           Verify email →
         </a>
         <p style="color: #9ca3af; font-size: 13px; margin-top: 24px; line-height: 1.6;">
-          This link expires in <strong>24 hours</strong>. If you didn't create a FoodDash account,
+          This link expires in <strong>24 hours</strong>. If you didn't create a SnapBite account,
           you can safely ignore this email.
         </p>
         <hr style="border: none; border-top: 1px solid #f3f4f6; margin: 24px 0;" />
         <p style="color: #d1d5db; font-size: 12px; text-align: center;">
-          © ${new Date().getFullYear()} FoodDash. All rights reserved.
+          © ${new Date().getFullYear()} SnapBite. All rights reserved.
         </p>
       </div>
     `;

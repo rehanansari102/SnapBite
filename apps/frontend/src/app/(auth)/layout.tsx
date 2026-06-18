@@ -43,7 +43,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-2 mb-8 animate-fade-in">
             <span className="text-3xl animate-float inline-block">🍔</span>
-            <span className="text-2xl font-extrabold text-orange-500">FoodDash</span>
+            <span className="text-2xl font-extrabold text-orange-500">SnapBite</span>
           </div>
           {children}
         </div>

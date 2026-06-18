@@ -1,7 +1,7 @@
 import AuthForm from '@/components/auth/AuthForm'
 import { login } from '@/app/actions/auth'
 
-export const metadata = { title: 'Log in — FoodDash' }
+export const metadata = { title: 'Log in — SnapBite' }
 
 export default function LoginPage({
   searchParams,

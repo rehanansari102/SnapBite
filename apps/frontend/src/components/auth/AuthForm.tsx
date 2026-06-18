@@ -23,7 +23,7 @@ export default function AuthForm({ mode, action }: Props) {
           {isRegister ? 'New account' : 'Welcome back'}
         </div>
         <h1 className="text-2xl font-extrabold text-gray-900 mb-1">
-          {isRegister ? 'Create your account' : 'Log in to FoodDash'}
+          {isRegister ? 'Create your account' : 'Log in to SnapBite'}
         </h1>
         <p className="text-sm text-gray-500">
           {isRegister

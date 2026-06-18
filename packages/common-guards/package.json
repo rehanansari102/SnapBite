@@ -1,5 +1,5 @@
 {
-  "name": "@food-dash/common-guards",
+  "name": "@snapbite/common-guards",
   "version": "1.0.0",
   "private": true,
   "main": "dist/index.js",

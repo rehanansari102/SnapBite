@@ -20,12 +20,15 @@ async function gatewayFetch(
   path: string,
   options: RequestInit & { cookies?: string },
 ): Promise<Response> {
+  const { cookies: cookieStr, headers: callerHeaders, ...rest } = options
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(options.cookies ? { Cookie: options.cookies } : {}),
+    ...(cookieStr ? { Cookie: cookieStr } : {}),
+    // Forward any extra headers the caller provided (e.g. Authorization)
+    ...(callerHeaders as Record<string, string> | undefined ?? {}),
   }
   try {
-    return await fetch(`${GATEWAY}${path}`, { ...options, headers })
+    return await fetch(`${GATEWAY}${path}`, { ...rest, headers })
   } catch {
     throw new Error('Unable to reach the server. Please try again later.')
   }
@@ -189,6 +192,12 @@ export async function apiGetRestaurant(id: string): Promise<Restaurant> {
   return res.json()
 }
 
+export async function apiGetAllRestaurants(): Promise<Restaurant[]> {
+  const res = await gatewayFetch('/api/restaurants', { method: 'GET' })
+  if (!res.ok) throw new Error('Failed to fetch restaurants')
+  return res.json()
+}
+
 export async function apiGetNearbyRestaurants(lat: number, lng: number, radius?: number): Promise<Restaurant[]> {
   const params = new URLSearchParams({ lat: String(lat), lng: String(lng), ...(radius ? { radius: String(radius) } : {}) })
   const res = await gatewayFetch(`/api/restaurants/nearby?${params}`, { method: 'GET' })
@@ -293,5 +302,280 @@ export async function apiToggleMenuItem(accessToken: string, restaurantId: strin
     headers: { Authorization: `Bearer ${accessToken}` } as never,
   })
   if (!res.ok) throw new Error('Failed to toggle item availability')
+  return res.json()
+}
+
+// ── User Profile ──────────────────────────────────────────────────────────────
+
+export interface UserAddress {
+  id: string
+  label: string
+  street: string
+  city: string
+  country: string
+  lat: number
+  lng: number
+  isDefault: boolean
+}
+
+export interface UserProfile {
+  userId: string
+  email: string
+  firstName?: string
+  lastName?: string
+  phone?: string
+  avatarUrl?: string
+  addresses: UserAddress[]
+  savedRestaurantIds: string[]
+}
+
+export interface UpdateProfilePayload {
+  firstName?: string
+  lastName?: string
+  phone?: string
+  avatarUrl?: string
+}
+
+export interface AddAddressPayload {
+  label: string
+  street: string
+  city: string
+  country: string
+  lat: number
+  lng: number
+  isDefault?: boolean
+}
+
+export async function apiGetMe(accessToken: string): Promise<UserProfile> {
+  const res = await gatewayFetch('/api/users/me', {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${accessToken}` } as never,
+  })
+  if (!res.ok) throw new Error('Failed to fetch profile')
+  return res.json()
+}
+
+export async function apiUpdateProfile(accessToken: string, payload: UpdateProfilePayload): Promise<UserProfile> {
+  const res = await gatewayFetch('/api/users/me', {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${accessToken}` } as never,
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body?.message ?? 'Failed to update profile')
+  }
+  return res.json()
+}
+
+export async function apiAddAddress(accessToken: string, payload: AddAddressPayload): Promise<UserProfile> {
+  const res = await gatewayFetch('/api/users/me/addresses', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}` } as never,
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body?.message ?? 'Failed to add address')
+  }
+  return res.json()
+}
+
+export async function apiRemoveAddress(accessToken: string, addressId: string): Promise<UserProfile> {
+  const res = await gatewayFetch(`/api/users/me/addresses/${addressId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${accessToken}` } as never,
+  })
+  if (!res.ok) throw new Error('Failed to remove address')
+  return res.json()
+}
+
+// ── Orders ────────────────────────────────────────────────────────────────────
+
+export interface CartItem {
+  menuItemId: string
+  name: string
+  price: number
+  quantity: number
+  imageUrl?: string
+}
+
+export interface Cart {
+  restaurantId: string
+  restaurantName: string
+  items: CartItem[]
+  subtotal: number
+}
+
+export interface DeliveryAddress {
+  street: string
+  city: string
+  country: string
+  lat?: number
+  lng?: number
+}
+
+export interface OrderItem {
+  menuItemId: string
+  name: string
+  price: number
+  quantity: number
+  imageUrl?: string
+}
+
+export type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PREPARING' | 'READY' | 'PICKED_UP' | 'DELIVERED' | 'CANCELLED'
+
+export interface Order {
+  _id: string
+  customerId: string
+  restaurantId: string
+  restaurantName: string
+  items: OrderItem[]
+  deliveryAddress: DeliveryAddress
+  subtotal: number
+  deliveryFee: number
+  total: number
+  status: OrderStatus
+  notes?: string
+  cancelReason?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export async function apiGetCart(accessToken: string): Promise<Cart | null> {
+  const res = await gatewayFetch('/api/orders/cart', {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${accessToken}` } as never,
+  })
+  if (!res.ok) return null
+  return res.json()
+}
+
+export async function apiAddToCart(accessToken: string, payload: {
+  menuItemId: string
+  restaurantId: string
+  restaurantName: string
+  name: string
+  price: number
+  quantity: number
+  imageUrl?: string
+}): Promise<Cart> {
+  const res = await gatewayFetch('/api/orders/cart/items', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}` } as never,
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body?.message ?? 'Failed to add to cart')
+  }
+  return res.json()
+}
+
+export async function apiUpdateCartItem(accessToken: string, menuItemId: string, quantity: number): Promise<Cart> {
+  const res = await gatewayFetch(`/api/orders/cart/items/${menuItemId}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${accessToken}` } as never,
+    body: JSON.stringify({ quantity }),
+  })
+  if (!res.ok) throw new Error('Failed to update cart item')
+  return res.json()
+}
+
+export async function apiRemoveCartItem(accessToken: string, menuItemId: string): Promise<void> {
+  await gatewayFetch(`/api/orders/cart/items/${menuItemId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${accessToken}` } as never,
+  })
+}
+
+export async function apiClearCart(accessToken: string): Promise<void> {
+  await gatewayFetch('/api/orders/cart', {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${accessToken}` } as never,
+  })
+}
+
+export async function apiPlaceOrder(accessToken: string, payload: {
+  deliveryAddress: DeliveryAddress
+  notes?: string
+}): Promise<Order> {
+  const res = await gatewayFetch('/api/orders', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}` } as never,
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body?.message ?? 'Failed to place order')
+  }
+  return res.json()
+}
+
+export async function apiGetMyOrders(accessToken: string): Promise<Order[]> {
+  const res = await gatewayFetch('/api/orders', {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${accessToken}` } as never,
+  })
+  if (!res.ok) throw new Error('Failed to fetch orders')
+  return res.json()
+}
+
+export async function apiGetOrder(accessToken: string, orderId: string): Promise<Order> {
+  const res = await gatewayFetch(`/api/orders/${orderId}`, {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${accessToken}` } as never,
+  })
+  if (!res.ok) throw new Error('Order not found')
+  return res.json()
+}
+
+export async function apiGetRestaurantOrders(accessToken: string, restaurantId: string): Promise<Order[]> {
+  const res = await gatewayFetch(`/api/orders/restaurant/${restaurantId}`, {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${accessToken}` } as never,
+  })
+  if (!res.ok) throw new Error('Failed to fetch restaurant orders')
+  return res.json()
+}
+
+export async function apiUpdateOrderStatus(accessToken: string, orderId: string, status: OrderStatus, cancelReason?: string): Promise<Order> {
+  const res = await gatewayFetch(`/api/orders/${orderId}/status`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${accessToken}` } as never,
+    body: JSON.stringify({ status, cancelReason }),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body?.message ?? 'Failed to update order status')
+  }
+  return res.json()
+}
+
+// ── Media ─────────────────────────────────────────────────────────────────────
+
+export type MediaFolder = 'avatars' | 'restaurants' | 'menus'
+
+export interface PresignedUrlResult {
+  uploadUrl: string
+  publicUrl: string
+  key: string
+}
+
+export async function apiGetPresignedUrl(
+  accessToken: string,
+  fileName: string,
+  contentType: string,
+  folder: MediaFolder,
+): Promise<PresignedUrlResult> {
+  const res = await gatewayFetch('/api/media/presigned-url', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}` } as never,
+    body: JSON.stringify({ fileName, contentType, folder }),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body?.message ?? 'Failed to get upload URL')
+  }
   return res.json()
 }

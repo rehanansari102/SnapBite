@@ -1,0 +1,142 @@
+name: snapbite
+
+# ─────────────────────────────────────────────────────────────
+#  Production — app services only (no self-hosted databases)
+#  PostgreSQL → Neon         (DATABASE_URL in auth-service .env)
+#  Redis      → Upstash      (REDIS_URL in each service .env)
+#  MongoDB    → Atlas        (MONGODB_URI in each service .env)
+#  Usage: docker-compose -f docker-compose.prod.yml up -d
+#         (shortcut: pnpm prod:up)
+#  Required env vars: JWT_SECRET, APP_URL
+# ─────────────────────────────────────────────────────────────
+
+services:
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: apps/auth-service/Dockerfile
+    container_name: fd-auth-service
+    restart: unless-stopped
+    env_file:
+      - ./apps/auth-service/.env
+    environment:
+      NODE_ENV: production
+    ports:
+      - '3001:3001'
+      - '50051:50051'
+
+  user-service:
+    build:
+      context: .
+      dockerfile: apps/user-service/Dockerfile
+    container_name: fd-user-service
+    restart: unless-stopped
+    env_file:
+      - ./apps/user-service/.env
+    environment:
+      PORT: 3002
+      NODE_ENV: production
+    ports:
+      - '3002:3002'
+
+  restaurant-service:
+    build:
+      context: .
+      dockerfile: apps/restaurant-service/Dockerfile
+    container_name: fd-restaurant-service
+    restart: unless-stopped
+    env_file:
+      - ./apps/restaurant-service/.env
+    environment:
+      PORT: 3003
+      NODE_ENV: production
+    ports:
+      - '3003:3003'
+
+  menu-service:
+    build:
+      context: .
+      dockerfile: apps/menu-service/Dockerfile
+    container_name: fd-menu-service
+    restart: unless-stopped
+    env_file:
+      - ./apps/menu-service/.env
+    environment:
+      PORT: 3004
+      NODE_ENV: production
+    ports:
+      - '3004:3004'
+
+  order-service:
+    build:
+      context: .
+      dockerfile: apps/order-service/Dockerfile
+    container_name: fd-order-service
+    restart: unless-stopped
+    env_file:
+      - ./apps/order-service/.env
+    environment:
+      PORT: 3005
+      NODE_ENV: production
+    ports:
+      - '3005:3005'
+
+  media-service:
+    build:
+      context: .
+      dockerfile: apps/media-service/Dockerfile
+    container_name: fd-media-service
+    restart: unless-stopped
+    env_file:
+      - ./apps/media-service/.env
+    environment:
+      PORT: 3011
+      NODE_ENV: production
+    ports:
+      - '3011:3011'
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: apps/api-gateway/Dockerfile
+    container_name: fd-api-gateway
+    restart: unless-stopped
+    env_file:
+      - ./apps/api-gateway/.env
+    environment:
+      PORT: 3000
+      NODE_ENV: production
+      JWT_SECRET: ${JWT_SECRET}
+      AUTH_SERVICE_URL: http://fd-auth-service:3001
+      AUTH_SERVICE_GRPC_URL: fd-auth-service:50051
+      USER_SERVICE_URL: http://fd-user-service:3002
+      RESTAURANT_SERVICE_URL: http://fd-restaurant-service:3003
+      MENU_SERVICE_URL: http://fd-menu-service:3004
+      MEDIA_SERVICE_URL: http://fd-media-service:3011
+      ORDER_SERVICE_URL: http://fd-order-service:3005
+    ports:
+      - '3000:3000'
+    depends_on:
+      - auth-service
+      - user-service
+      - restaurant-service
+      - menu-service
+      - media-service
+      - order-service
+
+  frontend:
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+    container_name: fd-frontend
+    restart: unless-stopped
+    env_file:
+      - ./apps/frontend/.env
+    environment:
+      API_GATEWAY_URL: http://fd-api-gateway:3000
+      NEXT_PUBLIC_APP_URL: ${APP_URL}
+    ports:
+      - '3010:3010'
+    depends_on:
+      - api-gateway

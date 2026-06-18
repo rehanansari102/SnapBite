@@ -1,5 +1,5 @@
 {
-  "name": "@food-dash/proto",
+  "name": "@snapbite/proto",
   "version": "1.0.0",
   "private": true,
   "main": "dist/index.js",

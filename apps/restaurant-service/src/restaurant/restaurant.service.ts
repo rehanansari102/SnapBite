@@ -54,6 +54,20 @@ export class RestaurantService {
     return restaurant as unknown as Restaurant;
   }
 
+  async findAll(): Promise<Restaurant[]> {
+    const cacheKey = 'restaurant:all';
+    const cached = await this.redisService.get(cacheKey);
+    if (cached) return JSON.parse(cached) as Restaurant[];
+
+    const restaurants = await this.restaurantModel
+      .find({ isActive: true, isApproved: true })
+      .sort({ rating: -1 })
+      .lean();
+
+    await this.redisService.set(cacheKey, JSON.stringify(restaurants), this.nearbyTtl);
+    return restaurants as unknown as Restaurant[];
+  }
+
   async findByOwner(ownerId: string): Promise<Restaurant[]> {
     return this.restaurantModel.find({ ownerId, isActive: true }).lean() as unknown as Restaurant[];
   }

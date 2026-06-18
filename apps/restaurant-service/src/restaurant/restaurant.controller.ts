@@ -30,6 +30,11 @@ export class RestaurantController {
     return this.restaurantService.create(req.headers['x-user-id'], dto);
   }
 
+  @Get()
+  findAll() {
+    return this.restaurantService.findAll();
+  }
+
   @Get('nearby')
   findNearby(@Query() query: NearbyQueryDto) {
     return this.restaurantService.findNearby(query);
