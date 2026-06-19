@@ -34,6 +34,12 @@ async function gatewayFetch(
   }
 }
 
+function extractRefreshTokenFromCookie(res: Response): string {
+  const setCookie = res.headers.get('set-cookie') ?? ''
+  const match = setCookie.match(/refresh_token=([^;]+)/)
+  return match?.[1] ?? ''
+}
+
 export async function apiRegister(email: string, password: string): Promise<AuthResult> {
   const res = await gatewayFetch('/api/auth/register', {
     method: 'POST',
@@ -43,7 +49,8 @@ export async function apiRegister(email: string, password: string): Promise<Auth
     const body = await res.json().catch(() => ({}))
     throw new Error(body?.message ?? 'Registration failed')
   }
-  return res.json()
+  const body = await res.json()
+  return { ...body, refreshToken: extractRefreshTokenFromCookie(res) }
 }
 
 export async function apiLogin(email: string, password: string): Promise<AuthResult> {
@@ -55,7 +62,8 @@ export async function apiLogin(email: string, password: string): Promise<AuthRes
     const body = await res.json().catch(() => ({}))
     throw new Error(body?.message ?? 'Invalid credentials')
   }
-  return res.json()
+  const body = await res.json()
+  return { ...body, refreshToken: extractRefreshTokenFromCookie(res) }
 }
 
 // Called with the current refresh_token cookie value so the backend can verify it.
@@ -65,7 +73,8 @@ export async function apiRefresh(refreshTokenCookie: string): Promise<AuthResult
     cookies: `refresh_token=${refreshTokenCookie}`,
   })
   if (!res.ok) throw new Error('Session expired')
-  return res.json()
+  const body = await res.json()
+  return { ...body, refreshToken: extractRefreshTokenFromCookie(res) }
 }
 
 export async function apiLogout(accessToken: string, refreshTokenCookie: string): Promise<void> {

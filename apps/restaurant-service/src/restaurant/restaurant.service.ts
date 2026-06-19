@@ -69,7 +69,7 @@ export class RestaurantService {
   }
 
   async findByOwner(ownerId: string): Promise<Restaurant[]> {
-    return this.restaurantModel.find({ ownerId, isActive: true }).lean() as unknown as Restaurant[];
+    return this.restaurantModel.find({ ownerId }).lean() as unknown as Restaurant[];
   }
 
   async findNearby(query: NearbyQueryDto): Promise<Restaurant[]> {

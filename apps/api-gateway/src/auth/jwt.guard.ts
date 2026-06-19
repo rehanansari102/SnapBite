@@ -31,7 +31,7 @@ export class JwtAuthGuard implements CanActivate {
 
     // Public routes — no token required
     if (request.path.startsWith('/api/auth')) return true;
-    if (request.method === 'GET' && request.path.startsWith('/api/restaurants')) return true;
+    if (request.method === 'GET' && request.path.startsWith('/api/restaurants') && !request.path.includes('/my')) return true;
     if (request.method === 'GET' && request.path.startsWith('/api/menus')) return true;
 
     const token = this.extractToken(request);
