@@ -18,7 +18,7 @@ API Gateway :3000  (NestJS — routing, JWT guard, rate limiting)
     └── /api/reviews/*     → Review Service      :3009  (MongoDB)       ← not built
 
 Internal event bus: Redis Pub/Sub (→ Kafka in production)
-Real-time:          WebSocket Gateway (NestJS @WebSocketGateway)       ← not built
+Real-time:          WebSocket Gateway (NestJS @WebSocketGateway)       ✅ built
 ```
 
 ---
@@ -185,8 +185,11 @@ blacklist:{jti}              → "1"  (TTL = token expiry)
 | API Gateway | NestJS reverse proxy + JWT guard |
 | Email | Brevo (@getbrevo/brevo) |
 | File storage | AWS S3 / Cloudflare R2 (presigned URLs) |
+| Payments | Stripe (payment intents, server-side confirmation) |
+| Real-time | Socket.IO WebSocket gateway (HS256 JWT auth) |
 | Containerisation | Docker + Docker Compose |
 | Monorepo | pnpm workspaces |
+| CI | GitHub Actions (8 parallel jobs — type check + unit tests) |
 
 ---
 
@@ -294,26 +297,43 @@ blacklist:{jti}              → "1"  (TTL = token expiry)
 - [x] Order history page with status badges and date (`/orders`)
 - [x] Order detail page — progress tracker, items, address, cancel flow (`/orders/:id`)
 - [x] Restaurant owner incoming orders dashboard — restaurant picker, active/all filter, advance status (`/dashboard/orders`)
+- [x] Reorder button on order history
 
 ---
 
-### Phase 4 — Payments ❌
-**Payment Service (`:3006`, PostgreSQL)**
-- [ ] Create payment intent (Stripe)
-  - `POST /payments/intent`
-- [ ] Confirm payment, release order
-  - `POST /payments/confirm`
-- [ ] Refund on cancellation
-  - `POST /payments/refund/:id`
-- [ ] Customer payment history
-  - `GET /payments/history`
+### Phase 4 — Payments ✅ (core complete)
+> Implemented directly in Order Service rather than as a separate Payment Service.
+
+**Order Service — Payment features**
+- [x] Stripe payment intent created at order placement for CARD orders
+- [x] Confirm payment with server-side Stripe verification — `POST /orders/:id/confirm-payment`
+  - Verifies customer ownership, stored paymentIntentId, and Stripe metadata before updating status
+- [x] COD (cash on delivery) flow — no Stripe, marked UNPAID until delivery
+- [x] `paymentStatus` field: `UNPAID | PAID | FAILED | REFUNDED`
+- [ ] Refund on cancellation — `POST /payments/refund/:id`
 - [ ] Payment captured only after `order.confirmed` event
 - [ ] Full refund if restaurant cancels within 5 min
 
+**Security hardening (order-service)**
+- [x] Ownership verification — fetches restaurant-service to confirm ownerId before any mutation
+- [x] Sensitive field sanitization — `ownerEmail` and `stripeClientSecret` stripped from all responses
+- [x] Payment confirmation verifies customer identity + stored paymentIntentId + Stripe metadata match
+
 **Frontend**
-- [ ] Stripe Elements embedded in checkout page
-- [ ] Restaurant owner earnings dashboard (`/dashboard/earnings`)
+- [x] Stripe Elements embedded in checkout page
+- [x] Restaurant owner earnings dashboard — revenue, card vs COD split, 14-day bar chart, top sellers (`/dashboard/earnings`)
 - [ ] Receipt / invoice view
+
+**Real-time (WebSocket)**
+- [x] `OrderGateway` — Socket.IO gateway with HS256 JWT auth (no `jsonwebtoken` dep)
+- [x] Restaurant owner notification bell — live new order alerts via `restaurant:{id}` rooms
+- [x] CORS locked to `CORS_ORIGIN` env var (no wildcard)
+- [x] Token delivery via `getWsToken()` server action (bypasses HttpOnly cookie cross-port issue)
+- [ ] `order:{orderId}:status` — order status push → customer
+- [ ] `delivery:{orderId}:location` — driver GPS → customer map
+
+**Email**
+- [x] New order email to restaurant owner via Brevo on every placed order
 
 ---
 
@@ -411,15 +431,31 @@ blacklist:{jti}              → "1"  (TTL = token expiry)
 
 ---
 
-### Phase 10 — Production Readiness ❌
+### Phase 10 — Production Readiness 🔄
+**CI / Testing (complete)**
+- [x] GitHub Actions CI — 8 parallel jobs on every push to `dev` and every PR to `main`
+  - Order Service: unit tests (jwt.util, order.service, payment.service) + type check
+  - Auth Service: unit tests (register/login/verifyEmail/forgotPassword/resetPassword/logout/verifyToken) + type check
+  - Menu Service: unit tests (CRUD + cache invalidation) + type check
+  - User Service: unit tests (profile upsert + address management) + type check
+  - Media Service: unit tests (presigned URL + delete) + type check
+  - Restaurant Service: type check
+  - API Gateway: type check
+  - Frontend: type check
+- [x] Branch protection — `main` requires all 8 checks to pass before merge
+- [x] `dev` branch workflow — work on dev, PR to main, CI gates the merge
+
+**Remaining**
 - [ ] Replace TypeORM `synchronize: true` with proper migration files
 - [ ] Replace Redis Pub/Sub with Kafka for reliable event delivery
-- [ ] GitHub Actions CI/CD — test → build → push Docker image → deploy
+- [ ] CD pipeline — build Docker image → push to registry → deploy on merge to main
 - [ ] Kubernetes manifests or AWS ECS task definitions
 - [ ] AWS Secrets Manager instead of `.env` files
 - [ ] CDN for media files (CloudFront in front of S3)
 - [ ] Distributed tracing (OpenTelemetry + Jaeger)
 - [ ] Per-user rate limiting (not just per-IP)
+- [ ] Integration tests (real MongoDB + Redis in CI via Docker services)
+- [ ] E2E tests (Playwright — login → browse → checkout → pay)
 
 ---
 
