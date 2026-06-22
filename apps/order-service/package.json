@@ -9,17 +9,21 @@
     "test": "jest"
   },
   "dependencies": {
+    "@getbrevo/brevo": "^3.0.4",
     "@nestjs/common": "^11.0.0",
     "@nestjs/config": "^3.2.3",
     "@nestjs/core": "^11.0.0",
     "@nestjs/mongoose": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
+    "@nestjs/platform-socket.io": "^11.1.27",
+    "@nestjs/websockets": "^11.1.27",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "ioredis": "^5.4.1",
     "mongoose": "^8.4.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
+    "socket.io": "^4.8.3",
     "stripe": "^22.2.2",
     "uuid": "^10.0.0"
   },

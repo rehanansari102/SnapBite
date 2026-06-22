@@ -50,6 +50,7 @@ export class Order {
   @Prop({ required: true, index: true }) customerId: string;
   @Prop({ required: true, index: true }) restaurantId: string;
   @Prop({ required: true }) restaurantName: string;
+  @Prop() ownerEmail: string;
 
   @Prop({ type: [OrderItemSchema], required: true }) items: OrderItem[];
   @Prop({ type: DeliveryAddressSchema, required: true }) deliveryAddress: DeliveryAddress;

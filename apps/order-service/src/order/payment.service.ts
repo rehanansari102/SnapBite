@@ -13,7 +13,7 @@ export class PaymentService {
   ) {
     const secretKey = process.env.STRIPE_SECRET_KEY;
     if (!secretKey) throw new InternalServerErrorException('STRIPE_SECRET_KEY not set');
-    this.stripe = new Stripe(secretKey, { apiVersion: '2025-05-28.basil' });
+    this.stripe = new Stripe(secretKey, { apiVersion: '2026-05-27.dahlia' });
   }
 
   async createPaymentIntent(orderId: string, customerId: string): Promise<{ clientSecret: string; paymentIntentId: string }> {
@@ -44,9 +44,23 @@ export class PaymentService {
     return { clientSecret: intent.client_secret!, paymentIntentId: intent.id };
   }
 
-  async confirmPayment(paymentIntentId: string): Promise<Order> {
+  async confirmPayment(orderId: string, customerId: string, paymentIntentId: string): Promise<Order> {
+    const order = await this.orderModel.findById(orderId).lean();
+    if (!order) throw new NotFoundException('Order not found');
+
+    const o = order as any;
+    if (o.customerId !== customerId) throw new BadRequestException('Not your order');
+
+    // Verify the paymentIntentId matches what we stored — prevents confirming a different intent
+    if (o.stripePaymentIntentId && o.stripePaymentIntentId !== paymentIntentId) {
+      throw new BadRequestException('Payment intent mismatch');
+    }
+
     const intent = await this.stripe.paymentIntents.retrieve(paymentIntentId);
-    const orderId = intent.metadata.orderId;
+    // Double-check the intent's metadata also matches this order
+    if (intent.metadata.orderId !== orderId) {
+      throw new BadRequestException('Payment intent does not belong to this order');
+    }
 
     const newPaymentStatus =
       intent.status === 'succeeded' ? PaymentStatus.PAID : PaymentStatus.FAILED;

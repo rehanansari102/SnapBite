@@ -14,6 +14,7 @@ interface AuthRequest extends Request {
   headers: Request['headers'] & {
     'x-user-id': string;
     'x-user-role': string;
+    'x-user-email': string;
   };
 }
 
@@ -27,7 +28,7 @@ export class RestaurantController {
     if (role !== 'restaurant_owner' && role !== 'admin') {
       throw new ForbiddenException('Only restaurant owners can create restaurants');
     }
-    return this.restaurantService.create(req.headers['x-user-id'], dto);
+    return this.restaurantService.create(req.headers['x-user-id'], req.headers['x-user-email'], dto);
   }
 
   @Get()

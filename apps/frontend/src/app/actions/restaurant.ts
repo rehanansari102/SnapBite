@@ -25,6 +25,16 @@ export async function getAllRestaurants() {
   return apiGetAllRestaurants()
 }
 
+export async function getMyRestaurantsForNotifications() {
+  const accessToken = await getAccessToken()
+  if (!accessToken) return []
+  try {
+    return await apiGetMyRestaurants(accessToken)
+  } catch {
+    return []
+  }
+}
+
 export async function getNearbyRestaurants(lat: number, lng: number, radius = 20) {
   return apiGetNearbyRestaurants(lat, lng, radius)
 }

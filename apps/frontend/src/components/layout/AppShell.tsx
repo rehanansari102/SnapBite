@@ -3,12 +3,19 @@
 import { useEffect, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import { logout } from '@/app/actions/auth'
 import ThemeToggle from '@/components/ThemeToggle'
+
+const OwnerNotificationBell = dynamic(
+  () => import('@/components/layout/OwnerNotificationBell'),
+  { ssr: false }
+)
 
 interface Props {
   email: string
   role: string
+  restaurantIds: string[]
   children: React.ReactNode
 }
 
@@ -33,6 +40,9 @@ const OWNER_NAV_ITEMS = [
   )},
   { label: 'Incoming Orders', href: '/dashboard/orders', icon: (
     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+  )},
+  { label: 'Earnings', href: '/dashboard/earnings', icon: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
   )},
 ]
 
@@ -69,7 +79,7 @@ function NavLink({ href, icon, label, onClick }: { href: string; icon: React.Rea
   )
 }
 
-export default function AppShell({ email, role, children }: Props) {
+export default function AppShell({ email, role, restaurantIds, children }: Props) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -169,6 +179,10 @@ export default function AppShell({ email, role, children }: Props) {
           <div className="flex-1" />
 
           <ThemeToggle />
+
+          {restaurantIds.length > 0 && (
+            <OwnerNotificationBell restaurantIds={restaurantIds} />
+          )}
 
           {/* Cart quick link */}
           <Link href="/cart" className="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/30 transition-colors">

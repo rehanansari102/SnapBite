@@ -156,3 +156,8 @@ export async function resendVerification(): Promise<SimpleState> {
     return { message: err instanceof Error ? err.message : 'Failed to resend.' }
   }
 }
+
+// Returns the access token for WebSocket auth (avoids exposing cookie to client JS directly)
+export async function getWsToken(): Promise<string | undefined> {
+  return getAccessToken()
+}

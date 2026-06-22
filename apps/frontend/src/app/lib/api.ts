@@ -553,6 +553,27 @@ export async function apiGetRestaurantOrders(accessToken: string, restaurantId: 
   return res.json()
 }
 
+export type EarningsData = {
+  totalRevenue: number
+  cardRevenue: number
+  codRevenue: number
+  totalOrders: number
+  deliveredCount: number
+  pendingCount: number
+  avgOrderValue: number
+  daily: { date: string; revenue: number; orders: number }[]
+  topItems: { name: string; quantity: number; revenue: number }[]
+}
+
+export async function apiGetRestaurantEarnings(accessToken: string, restaurantId: string): Promise<EarningsData> {
+  const res = await gatewayFetch(`/api/orders/restaurant/${restaurantId}/earnings`, {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${accessToken}` } as never,
+  })
+  if (!res.ok) throw new Error('Failed to fetch earnings')
+  return res.json()
+}
+
 export async function apiUpdateOrderStatus(accessToken: string, orderId: string, status: OrderStatus, cancelReason?: string): Promise<Order> {
   const res = await gatewayFetch(`/api/orders/${orderId}/status`, {
     method: 'PATCH',

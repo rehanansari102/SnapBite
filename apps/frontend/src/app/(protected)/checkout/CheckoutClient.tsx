@@ -52,8 +52,8 @@ export default function CheckoutClient({
           street: address.street,
           city: address.city,
           country: address.country,
-          lat: 'lat' in address ? address.lat : undefined,
-          lng: 'lng' in address ? address.lng : undefined,
+          lat: 'lat' in address ? (address.lat as number | undefined) : undefined,
+          lng: 'lng' in address ? (address.lng as number | undefined) : undefined,
         }, notes || undefined)
 
         if (paymentMethod === 'cod') {

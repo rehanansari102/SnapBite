@@ -75,7 +75,23 @@ export class OrderController {
     @Req() req: AuthRequest,
     @Param('restaurantId') restaurantId: string,
   ) {
-    return this.orderService.getRestaurantOrders(restaurantId);
+    return this.orderService.getRestaurantOrders(
+      restaurantId,
+      req.headers['x-user-id'],
+      req.headers['x-user-role'],
+    );
+  }
+
+  @Get('restaurant/:restaurantId/earnings')
+  getEarnings(
+    @Req() req: AuthRequest,
+    @Param('restaurantId') restaurantId: string,
+  ) {
+    return this.orderService.getEarnings(
+      restaurantId,
+      req.headers['x-user-id'],
+      req.headers['x-user-role'],
+    );
   }
 
   @Get(':id')
@@ -105,8 +121,12 @@ export class OrderController {
   }
 
   @Post(':id/payment-confirm')
-  confirmPayment(@Param('id') _id: string, @Body() body: { paymentIntentId: string }) {
-    return this.paymentService.confirmPayment(body.paymentIntentId);
+  confirmPayment(
+    @Req() req: AuthRequest,
+    @Param('id') id: string,
+    @Body() body: { paymentIntentId: string },
+  ) {
+    return this.paymentService.confirmPayment(id, req.headers['x-user-id'], body.paymentIntentId);
   }
 
   @Post('stripe/webhook')

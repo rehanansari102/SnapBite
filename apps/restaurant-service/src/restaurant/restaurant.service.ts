@@ -26,10 +26,11 @@ export class RestaurantService {
     this.nearbyTtl = Number(this.configService.get('NEARBY_CACHE_TTL', 120));
   }
 
-  async create(ownerId: string, dto: CreateRestaurantDto): Promise<Restaurant> {
+  async create(ownerId: string, ownerEmail: string, dto: CreateRestaurantDto): Promise<Restaurant> {
     const restaurant = await this.restaurantModel.create({
       ...dto,
       ownerId,
+      ownerEmail,
       location: {
         type: 'Point',
         coordinates: [dto.lng, dto.lat], // GeoJSON: [longitude, latitude]

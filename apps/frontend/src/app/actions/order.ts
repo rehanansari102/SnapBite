@@ -4,6 +4,7 @@ import { getAccessToken } from '@/app/lib/cookies'
 import {
   apiGetCart, apiAddToCart, apiUpdateCartItem, apiRemoveCartItem, apiClearCart,
   apiPlaceOrder, apiGetMyOrders, apiGetOrder, apiGetRestaurantOrders, apiUpdateOrderStatus,
+  apiGetRestaurantEarnings,
   type DeliveryAddress, type OrderStatus,
 } from '@/app/lib/api'
 
@@ -73,4 +74,10 @@ export async function updateOrderStatus(orderId: string, status: OrderStatus, ca
   const token = await getAccessToken()
   if (!token) throw new Error('Not authenticated')
   return apiUpdateOrderStatus(token, orderId, status, cancelReason)
+}
+
+export async function getRestaurantEarnings(restaurantId: string) {
+  const token = await getAccessToken()
+  if (!token) throw new Error('Not authenticated')
+  return apiGetRestaurantEarnings(token, restaurantId)
 }

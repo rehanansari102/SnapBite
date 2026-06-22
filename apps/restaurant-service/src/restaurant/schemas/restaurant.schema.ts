@@ -31,6 +31,7 @@ export class DayHours {
 @Schema({ timestamps: true })
 export class Restaurant {
   @Prop({ required: true }) ownerId: string;
+  @Prop() ownerEmail: string;
   @Prop({ required: true }) name: string;
   @Prop() description: string;
   @Prop({ type: [String], default: [] }) cuisineTypes: string[];

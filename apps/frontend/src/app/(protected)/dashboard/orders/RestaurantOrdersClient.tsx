@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useTransition, useEffect, useCallback } from 'react'
+import { useState, useTransition, useEffect, useCallback, useRef } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { getRestaurantOrders, updateOrderStatus } from '@/app/actions/order'
 import type { Order, OrderStatus, Restaurant } from '@/app/lib/api'
 
@@ -46,12 +47,27 @@ const OWNER_NEXT: Partial<Record<OrderStatus, OrderStatus>> = {
 const ACTIVE_STATUSES: OrderStatus[] = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'PICKED_UP']
 
 export default function RestaurantOrdersClient({ restaurants }: { restaurants: Restaurant[] }) {
+  const searchParams = useSearchParams()
+  const highlightId = searchParams.get('order')
+
   const [selectedId, setSelectedId] = useState<string>(restaurants[0]?._id ?? '')
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [isPending, startTransition] = useTransition()
   const [filter, setFilter] = useState<'active' | 'all'>('active')
+  const highlightRef = useRef<HTMLDivElement>(null)
+
+  // When arriving via notification link, show all orders and scroll to the target
+  useEffect(() => {
+    if (!highlightId) return
+    setFilter('all')
+  }, [highlightId])
+
+  useEffect(() => {
+    if (!highlightId || !highlightRef.current) return
+    highlightRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [highlightId, orders])
 
   const loadOrders = useCallback(async (restaurantId: string) => {
     if (!restaurantId) return
@@ -78,6 +94,13 @@ export default function RestaurantOrdersClient({ restaurants }: { restaurants: R
     const interval = setInterval(() => loadOrders(selectedId), 20_000)
     return () => clearInterval(interval)
   }, [orders, selectedId, loadOrders])
+
+  // Refresh immediately when the header bell receives a new order
+  useEffect(() => {
+    function handleNewOrder() { loadOrders(selectedId) }
+    window.addEventListener('snapbite:new-order', handleNewOrder)
+    return () => window.removeEventListener('snapbite:new-order', handleNewOrder)
+  }, [selectedId, loadOrders])
 
   function handleAdvance(orderId: string, nextStatus: OrderStatus) {
     startTransition(async () => {
@@ -156,8 +179,17 @@ export default function RestaurantOrdersClient({ restaurants }: { restaurants: R
         <div className="space-y-3">
           {displayed.map(order => {
             const nextStatus = OWNER_NEXT[order.status]
+            const isHighlighted = order._id === highlightId
             return (
-              <div key={order._id} className="rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+              <div
+                key={order._id}
+                ref={isHighlighted ? highlightRef : null}
+                className={`rounded-2xl border shadow-sm overflow-hidden hover:shadow-md transition-all ${
+                  isHighlighted
+                    ? 'border-orange-400 ring-2 ring-orange-300 ring-offset-2 shadow-orange-100'
+                    : 'border-gray-100'
+                }`}
+              >
                 <div className={`h-1 w-full ${STATUS_TOP[order.status]}`} />
                 <div className="bg-white p-5 space-y-3">
                   {/* Order header */}
