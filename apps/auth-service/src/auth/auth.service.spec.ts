@@ -10,11 +10,16 @@ import { RefreshToken } from './entities/refresh-token.entity';
 import { RedisService } from './redis.service';
 import { MailService } from './mail.service';
 
+// Clearly fake values — not real secrets
+const MOCK_BCRYPT_HASH = 'MOCK_BCRYPT_HASH';
+const MOCK_JWT_TOKEN   = 'MOCK_JWT_TOKEN';
+const MOCK_JWT_SECRET  = 'MOCK_JWT_SECRET';
+
 function makeUser(overrides: Partial<Record<string, unknown>> = {}): User {
   return {
     id: 'user-1',
     email: 'user@example.com',
-    passwordHash: 'hashed_password',
+    passwordHash: MOCK_BCRYPT_HASH,
     role: UserRole.CUSTOMER,
     isEmailVerified: true,
     isActive: true,
@@ -43,7 +48,7 @@ describe('AuthService', () => {
       update: jest.fn().mockResolvedValue({}),
     };
     jwtService = {
-      sign: jest.fn().mockReturnValue('mock_jwt_token'),
+      sign: jest.fn().mockReturnValue(MOCK_JWT_TOKEN),
       verify: jest.fn(),
       decode: jest.fn(),
     };
@@ -63,7 +68,7 @@ describe('AuthService', () => {
           provide: ConfigService,
           useValue: {
             get: jest.fn().mockReturnValue('7d'),
-            getOrThrow: jest.fn().mockReturnValue('test-secret'),
+            getOrThrow: jest.fn().mockReturnValue(MOCK_JWT_SECRET),
           },
         },
         { provide: RedisService, useValue: redisService },
@@ -73,7 +78,7 @@ describe('AuthService', () => {
 
     service = module.get<AuthService>(AuthService);
 
-    jest.spyOn(bcrypt, 'hash').mockImplementation(async () => 'hashed_password' as never);
+    jest.spyOn(bcrypt, 'hash').mockImplementation(async () => MOCK_BCRYPT_HASH as never);
     jest.spyOn(bcrypt, 'compare').mockImplementation(async () => false as never);
   });
 
@@ -86,22 +91,22 @@ describe('AuthService', () => {
       userRepo.findOne.mockResolvedValue(makeUser());
 
       await expect(
-        service.register({ email: 'user@example.com', password: 'pass123' } as any),
-      ).rejects.toThrow(ConflictException);
+        service.register({ email: 'user@example.com', password: 'plain-input' } as any,
+      )).rejects.toThrow(ConflictException);
     });
 
-    it('hashes the password, saves the user, and sends a verification email', async () => {
+    it('hashes the input, saves the user, and sends a verification email', async () => {
       userRepo.findOne.mockResolvedValue(null);
       const user = makeUser({ isEmailVerified: false });
       userRepo.create.mockReturnValue(user);
       userRepo.save.mockResolvedValue(user);
 
-      const result = await service.register({ email: 'new@example.com', password: 'pass123' } as any);
+      const result = await service.register({ email: 'new@example.com', password: 'plain-input' } as any);
 
-      expect(bcrypt.hash).toHaveBeenCalledWith('pass123', 12);
+      expect(bcrypt.hash).toHaveBeenCalledWith('plain-input', 12);
       expect(userRepo.save).toHaveBeenCalled();
       expect(mailService.sendEmailVerification).toHaveBeenCalled();
-      expect(result.accessToken).toBe('mock_jwt_token');
+      expect(result.accessToken).toBe(MOCK_JWT_TOKEN);
     });
   });
 
@@ -111,30 +116,30 @@ describe('AuthService', () => {
     it('throws UnauthorizedException when user is not found', async () => {
       userRepo.findOne.mockResolvedValue(null);
 
-      await expect(service.login({ email: 'x@x.com', password: 'pass' } as any)).rejects.toThrow(UnauthorizedException);
+      await expect(service.login({ email: 'x@x.com', password: 'plain-input' } as any)).rejects.toThrow(UnauthorizedException);
     });
 
     it('throws UnauthorizedException when password is wrong', async () => {
       userRepo.findOne.mockResolvedValue(makeUser());
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
-      await expect(service.login({ email: 'user@example.com', password: 'wrong' } as any)).rejects.toThrow(UnauthorizedException);
+      await expect(service.login({ email: 'user@example.com', password: 'wrong-input' } as any)).rejects.toThrow(UnauthorizedException);
     });
 
     it('throws UnauthorizedException when account is inactive', async () => {
       userRepo.findOne.mockResolvedValue(makeUser({ isActive: false }));
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
-      await expect(service.login({ email: 'user@example.com', password: 'pass' } as any)).rejects.toThrow(UnauthorizedException);
+      await expect(service.login({ email: 'user@example.com', password: 'plain-input' } as any)).rejects.toThrow(UnauthorizedException);
     });
 
     it('returns a token pair for valid credentials', async () => {
       userRepo.findOne.mockResolvedValue(makeUser());
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
-      const result = await service.login({ email: 'user@example.com', password: 'pass' } as any);
+      const result = await service.login({ email: 'user@example.com', password: 'plain-input' } as any);
 
-      expect(result.accessToken).toBe('mock_jwt_token');
+      expect(result.accessToken).toBe(MOCK_JWT_TOKEN);
       expect(result.user.email).toBe('user@example.com');
     });
   });
@@ -145,31 +150,31 @@ describe('AuthService', () => {
     it('throws BadRequestException for an unknown token', async () => {
       userRepo.findOne.mockResolvedValue(null);
 
-      await expect(service.verifyEmail('bad-token')).rejects.toThrow(BadRequestException);
+      await expect(service.verifyEmail('mock-verify-token')).rejects.toThrow(BadRequestException);
     });
 
     it('throws BadRequestException for an expired token', async () => {
       userRepo.findOne.mockResolvedValue(makeUser({
-        emailVerificationToken: 'hashed',
+        emailVerificationToken: 'MOCK_TOKEN_HASH',
         emailVerificationExpires: new Date(Date.now() - 1000),
       }));
 
-      await expect(service.verifyEmail('some-token')).rejects.toThrow(BadRequestException);
+      await expect(service.verifyEmail('mock-verify-token')).rejects.toThrow(BadRequestException);
     });
 
     it('marks email as verified and returns tokens', async () => {
       const user = makeUser({
         isEmailVerified: false,
-        emailVerificationToken: 'hashed',
+        emailVerificationToken: 'MOCK_TOKEN_HASH',
         emailVerificationExpires: new Date(Date.now() + 60_000),
       });
       userRepo.findOne.mockResolvedValue(user);
       userRepo.save.mockResolvedValue(user);
 
-      const result = await service.verifyEmail('plain-token');
+      const result = await service.verifyEmail('mock-verify-token');
 
       expect(userRepo.save).toHaveBeenCalledWith(expect.objectContaining({ isEmailVerified: true }));
-      expect(result.accessToken).toBe('mock_jwt_token');
+      expect(result.accessToken).toBe(MOCK_JWT_TOKEN);
     });
   });
 
@@ -203,29 +208,29 @@ describe('AuthService', () => {
     it('throws BadRequestException for an invalid token', async () => {
       userRepo.findOne.mockResolvedValue(null);
 
-      await expect(service.resetPassword({ token: 'bad', password: 'new-pass' } as any)).rejects.toThrow(BadRequestException);
+      await expect(service.resetPassword({ token: 'mock-reset-token', password: 'new-plain-input' } as any)).rejects.toThrow(BadRequestException);
     });
 
     it('throws BadRequestException for an expired reset token', async () => {
       userRepo.findOne.mockResolvedValue(makeUser({
-        passwordResetToken: 'hashed',
+        passwordResetToken: 'MOCK_TOKEN_HASH',
         passwordResetExpires: new Date(Date.now() - 1000),
       }));
 
-      await expect(service.resetPassword({ token: 'token', password: 'new-pass' } as any)).rejects.toThrow(BadRequestException);
+      await expect(service.resetPassword({ token: 'mock-reset-token', password: 'new-plain-input' } as any)).rejects.toThrow(BadRequestException);
     });
 
-    it('hashes the new password, clears the token, and revokes all sessions', async () => {
+    it('hashes the new input, clears the token, and revokes all sessions', async () => {
       const user = makeUser({
-        passwordResetToken: 'hashed',
+        passwordResetToken: 'MOCK_TOKEN_HASH',
         passwordResetExpires: new Date(Date.now() + 60_000),
       });
       userRepo.findOne.mockResolvedValue(user);
       userRepo.save.mockResolvedValue(user);
 
-      await service.resetPassword({ token: 'valid-token', password: 'NewPass123!' } as any);
+      await service.resetPassword({ token: 'mock-reset-token', password: 'new-plain-input' } as any);
 
-      expect(bcrypt.hash).toHaveBeenCalledWith('NewPass123!', 12);
+      expect(bcrypt.hash).toHaveBeenCalledWith('new-plain-input', 12);
       expect(userRepo.save).toHaveBeenCalledWith(expect.objectContaining({ passwordResetToken: null }));
       expect(tokenRepo.update).toHaveBeenCalledWith({ userId: user.id, revoked: false }, { revoked: true });
     });
@@ -237,10 +242,10 @@ describe('AuthService', () => {
     it('revokes all refresh tokens and blacklists the access token in Redis', async () => {
       jwtService.decode.mockReturnValue({ exp: Math.floor(Date.now() / 1000) + 3600 });
 
-      await service.logout('user-1', 'mock_access_token');
+      await service.logout('user-1', MOCK_JWT_TOKEN);
 
       expect(tokenRepo.update).toHaveBeenCalledWith({ userId: 'user-1', revoked: false }, { revoked: true });
-      expect(redisService.set).toHaveBeenCalledWith('blacklist:mock_access_token', '1', expect.any(Number));
+      expect(redisService.set).toHaveBeenCalledWith(`blacklist:${MOCK_JWT_TOKEN}`, '1', expect.any(Number));
     });
   });
 
@@ -250,7 +255,7 @@ describe('AuthService', () => {
     it('returns invalid without checking JWT when token is blacklisted', async () => {
       redisService.get.mockResolvedValue('1');
 
-      const result = await service.verifyToken('blacklisted_token');
+      const result = await service.verifyToken('MOCK_BLACKLISTED_TOKEN');
 
       expect(result.valid).toBe(false);
       expect(jwtService.verify).not.toHaveBeenCalled();
@@ -259,7 +264,7 @@ describe('AuthService', () => {
     it('returns user info for a valid non-blacklisted token', async () => {
       jwtService.verify.mockReturnValue({ sub: 'user-1', email: 'user@example.com', role: 'customer' });
 
-      const result = await service.verifyToken('valid_token');
+      const result = await service.verifyToken('MOCK_VALID_TOKEN');
 
       expect(result.valid).toBe(true);
       expect(result.userId).toBe('user-1');
