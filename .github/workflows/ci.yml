@@ -117,6 +117,9 @@ jobs:
       - name: Type check
         run: pnpm --filter @snapbite/auth-service exec tsc --noEmit
 
+      - name: Run unit tests
+        run: pnpm --filter @snapbite/auth-service test:ci
+
   type-check-menu-service:
     name: Menu Service — Type Check
     runs-on: ubuntu-latest
@@ -136,6 +139,9 @@ jobs:
 
       - name: Type check
         run: pnpm --filter @snapbite/menu-service exec tsc --noEmit
+
+      - name: Run unit tests
+        run: pnpm --filter @snapbite/menu-service test:ci
 
   type-check-media-service:
     name: Media Service — Type Check
@@ -157,6 +163,9 @@ jobs:
       - name: Type check
         run: pnpm --filter @snapbite/media-service exec tsc --noEmit
 
+      - name: Run unit tests
+        run: pnpm --filter @snapbite/media-service test:ci
+
   type-check-user-service:
     name: User Service — Type Check
     runs-on: ubuntu-latest
@@ -176,3 +185,6 @@ jobs:
 
       - name: Type check
         run: pnpm --filter @snapbite/user-service exec tsc --noEmit
+
+      - name: Run unit tests
+        run: pnpm --filter @snapbite/user-service test:ci
