@@ -6,6 +6,7 @@ import { Order, OrderStatus, PaymentStatus, PaymentMethod } from './schemas/orde
 import { CartService } from './cart.service';
 import { OrderGateway } from './order.gateway';
 import { MailService } from './mail.service';
+import { PaymentService } from './payment.service';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -57,9 +58,10 @@ describe('OrderService', () => {
       providers: [
         OrderService,
         { provide: getModelToken(Order.name), useValue: orderModel },
-        { provide: CartService,  useValue: { getCart: jest.fn(), clearCart: jest.fn() } },
-        { provide: OrderGateway, useValue: { emitNewOrder: jest.fn() } },
-        { provide: MailService,  useValue: { sendNewOrderToOwner: jest.fn().mockResolvedValue(undefined) } },
+        { provide: CartService,     useValue: { getCart: jest.fn(), clearCart: jest.fn() } },
+        { provide: OrderGateway,    useValue: { emitNewOrder: jest.fn() } },
+        { provide: MailService,     useValue: { sendNewOrderToOwner: jest.fn().mockResolvedValue(undefined) } },
+        { provide: PaymentService,  useValue: { refundOrder: jest.fn().mockResolvedValue(undefined) } },
       ],
     }).compile();
 
