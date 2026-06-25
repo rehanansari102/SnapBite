@@ -174,6 +174,46 @@ export async function apiReviewOwnerApplication(accessToken: string, userId: str
   return res.json()
 }
 
+// ── Admin User Management ─────────────────────────────────────────────────────
+
+export interface AdminUser {
+  id: string
+  email: string
+  role: string
+  isActive: boolean
+  isEmailVerified: boolean
+  ownerApplicationStatus: string
+  businessName: string | null
+  createdAt: string
+}
+
+export interface AdminUsersResult {
+  users: AdminUser[]
+  total: number
+  page: number
+  pages: number
+}
+
+export async function apiGetAllUsers(accessToken: string, page = 1): Promise<AdminUsersResult> {
+  const res = await gatewayFetch(`/api/auth/admin/users?page=${page}&limit=20`, {
+    headers: { Authorization: `Bearer ${accessToken}` } as never,
+  })
+  if (!res.ok) throw new Error('Failed to fetch users')
+  return res.json()
+}
+
+export async function apiBanUser(accessToken: string, userId: string): Promise<{ isActive: boolean }> {
+  const res = await gatewayFetch(`/api/auth/admin/users/${userId}/ban`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${accessToken}` } as never,
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body?.message ?? 'Failed to update user')
+  }
+  return res.json()
+}
+
 // ── Restaurant ────────────────────────────────────────────────────────────────
 
 export interface RestaurantAddress {

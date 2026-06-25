@@ -2,7 +2,7 @@
 
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
-import { apiLogin, apiLogout, apiRefresh, apiRegister, apiForgotPassword, apiResetPassword, apiVerifyEmail, apiResendVerification, apiApplyForOwner, apiGetOwnerApplications, apiReviewOwnerApplication } from '@/app/lib/api'
+import { apiLogin, apiLogout, apiRefresh, apiRegister, apiForgotPassword, apiResetPassword, apiVerifyEmail, apiResendVerification, apiApplyForOwner, apiGetOwnerApplications, apiReviewOwnerApplication, apiGetAllUsers, apiBanUser } from '@/app/lib/api'
 import { clearAuthCookies, getAccessToken, getRefreshToken, setAuthCookies } from '@/app/lib/cookies'
 
 export type AuthState = {
@@ -196,5 +196,29 @@ export async function reviewOwnerApplication(userId: string, approve: boolean): 
     return { success: true, message: result.message }
   } catch (err) {
     return { message: err instanceof Error ? err.message : 'Failed to process application.' }
+  }
+}
+
+// ── Admin User Management ─────────────────────────────────────────────────────
+
+export async function getAllUsers(page = 1) {
+  const accessToken = await getAccessToken()
+  if (!accessToken) return null
+  try {
+    return await apiGetAllUsers(accessToken, page)
+  } catch {
+    return null
+  }
+}
+
+export async function banUser(userId: string): Promise<SimpleState> {
+  const accessToken = await getAccessToken()
+  if (!accessToken) return { message: 'Please log in first.' }
+  try {
+    const result = await apiBanUser(accessToken, userId)
+    revalidatePath('/dashboard/admin/users')
+    return { success: true, message: result.isActive ? 'User unbanned.' : 'User banned.' }
+  } catch (err) {
+    return { message: err instanceof Error ? err.message : 'Failed to update user.' }
   }
 }

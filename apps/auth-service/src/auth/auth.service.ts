@@ -271,4 +271,23 @@ export class AuthService {
     });
     return { message: approve ? 'User promoted to restaurant owner' : 'Application rejected' };
   }
+
+  async getAllUsers(page = 1, limit = 20) {
+    const [users, total] = await this.userRepo.findAndCount({
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+      select: ['id', 'email', 'role', 'isActive', 'isEmailVerified', 'ownerApplicationStatus', 'businessName', 'createdAt'],
+    });
+    return { users, total, page, limit, pages: Math.ceil(total / limit) };
+  }
+
+  async banUser(targetId: string, adminId: string) {
+    if (targetId === adminId) throw new BadRequestException('Cannot ban yourself');
+    const user = await this.userRepo.findOne({ where: { id: targetId } });
+    if (!user) throw new BadRequestException('User not found');
+    if (user.role === UserRole.ADMIN) throw new BadRequestException('Cannot ban another admin');
+    await this.userRepo.update(targetId, { isActive: !user.isActive });
+    return { isActive: !user.isActive };
+  }
 }

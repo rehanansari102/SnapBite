@@ -141,6 +141,25 @@ export class AuthController {
     return this.authService.reviewOwnerApplication(id, body.approve);
   }
 
+  @Get('admin/users')
+  getAllUsers(
+    @Req() req: Request & { headers: Record<string, string> },
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    if (req.headers['x-user-role'] !== 'admin') throw new ForbiddenException();
+    return this.authService.getAllUsers(page ? Number(page) : 1, limit ? Number(limit) : 20);
+  }
+
+  @Patch('admin/users/:id/ban')
+  banUser(
+    @Req() req: Request & { headers: Record<string, string> },
+    @Param('id') id: string,
+  ) {
+    if (req.headers['x-user-role'] !== 'admin') throw new ForbiddenException();
+    return this.authService.banUser(id, req.headers['x-user-id']);
+  }
+
   // gRPC method — called by API Gateway to verify tokens
   @GrpcMethod('AuthService', 'VerifyToken')
   async verifyToken(data: { token: string }) {
