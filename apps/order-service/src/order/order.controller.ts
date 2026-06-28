@@ -1,11 +1,13 @@
 import {
   Controller, Get, Post, Patch, Delete,
-  Body, Param, Req, HttpCode, HttpStatus, RawBodyRequest,
+  Body, Param, Query, Req, HttpCode, HttpStatus, RawBodyRequest,
+  ForbiddenException,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { OrderService } from './order.service';
 import { CartService } from './cart.service';
 import { PaymentService } from './payment.service';
+import { PromoCodeService, CreatePromoDto } from './promo-code.service';
 import { AddToCartDto, UpdateCartItemDto } from './dto/cart.dto';
 import { PlaceOrderDto } from './dto/place-order.dto';
 import { UpdateStatusDto } from './dto/update-status.dto';
@@ -14,6 +16,7 @@ interface AuthRequest extends Request {
   headers: Request['headers'] & {
     'x-user-id': string;
     'x-user-role': string;
+    'x-user-email': string;
   };
 }
 
@@ -23,7 +26,42 @@ export class OrderController {
     private orderService: OrderService,
     private cartService: CartService,
     private paymentService: PaymentService,
+    private promoCodeService: PromoCodeService,
   ) {}
+
+  // ── Promo Codes ─────────────────────────────────────────────
+
+  @Get('promos/validate')
+  validatePromo(
+    @Query('code') code: string,
+    @Query('subtotal') subtotal: string,
+  ) {
+    return this.promoCodeService.validate(code, Number(subtotal));
+  }
+
+  @Get('promos')
+  listPromos(@Req() req: AuthRequest) {
+    if (req.headers['x-user-role'] !== 'admin') {
+      throw new ForbiddenException('Admin only');
+    }
+    return this.promoCodeService.findAll();
+  }
+
+  @Post('promos')
+  createPromo(@Req() req: AuthRequest, @Body() dto: CreatePromoDto) {
+    if (req.headers['x-user-role'] !== 'admin') {
+      throw new ForbiddenException('Admin only');
+    }
+    return this.promoCodeService.create(dto);
+  }
+
+  @Patch('promos/:id/deactivate')
+  deactivatePromo(@Req() req: AuthRequest, @Param('id') id: string) {
+    if (req.headers['x-user-role'] !== 'admin') {
+      throw new ForbiddenException('Admin only');
+    }
+    return this.promoCodeService.deactivate(id);
+  }
 
   // ── Cart ────────────────────────────────────────────────────
 
@@ -62,12 +100,17 @@ export class OrderController {
 
   @Post()
   placeOrder(@Req() req: AuthRequest, @Body() dto: PlaceOrderDto) {
-    return this.orderService.placeOrder(req.headers['x-user-id'], dto);
+    return this.orderService.placeOrder(req.headers['x-user-id'], req.headers['x-user-email'], dto);
   }
 
   @Get()
   getMyOrders(@Req() req: AuthRequest) {
     return this.orderService.getMyOrders(req.headers['x-user-id']);
+  }
+
+  @Get('admin/analytics')
+  getAdminAnalytics(@Req() req: AuthRequest) {
+    return this.orderService.getAdminAnalytics(req.headers['x-user-role']);
   }
 
   @Get('restaurant/:restaurantId')

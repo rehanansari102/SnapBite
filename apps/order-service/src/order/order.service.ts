@@ -13,6 +13,7 @@ import { CartService } from './cart.service';
 import { OrderGateway } from './order.gateway';
 import { MailService } from './mail.service';
 import { PaymentService } from './payment.service';
+import { PromoCodeService } from './promo-code.service';
 
 // Allowed status transitions per actor
 const CUSTOMER_TRANSITIONS: Partial<Record<OrderStatus, OrderStatus>> = {
@@ -46,13 +47,18 @@ function sanitizeOrders(orders: any[]): any[] {
 
 @Injectable()
 export class OrderService {
+  private readonly platformFeePercent: number;
+
   constructor(
     @InjectModel(Order.name) private orderModel: Model<OrderDocument>,
     private cartService: CartService,
     private orderGateway: OrderGateway,
     private mailService: MailService,
     private paymentService: PaymentService,
-  ) {}
+    private promoCodeService: PromoCodeService,
+  ) {
+    this.platformFeePercent = Number(process.env.PLATFORM_FEE_PERCENT ?? 10);
+  }
 
   // Fetches restaurant owner info from restaurant-service (internal)
   private async fetchRestaurantOwner(restaurantId: string): Promise<{ ownerEmail?: string; ownerId?: string }> {
@@ -77,7 +83,7 @@ export class OrderService {
     }
   }
 
-  async placeOrder(customerId: string, dto: PlaceOrderDto): Promise<Order> {
+  async placeOrder(customerId: string, customerEmail: string, dto: PlaceOrderDto): Promise<Order> {
     const cart = await this.cartService.getCart(customerId);
     if (!cart || cart.items.length === 0) {
       throw new BadRequestException('Cart is empty');
@@ -85,12 +91,25 @@ export class OrderService {
 
     const DELIVERY_FEE = 30;
     const subtotal = cart.subtotal;
-    const total = subtotal + DELIVERY_FEE;
+
+    // Validate promo code if provided
+    let discountAmount = 0;
+    let appliedPromoCode: string | undefined;
+    if (dto.promoCode) {
+      const promo = await this.promoCodeService.validate(dto.promoCode, subtotal);
+      discountAmount = promo.discountAmount;
+      appliedPromoCode = promo.promoCode;
+    }
+
+    const total = subtotal + DELIVERY_FEE - discountAmount;
+    const platformFee = Math.round(subtotal * this.platformFeePercent) / 100;
+    const restaurantEarnings = subtotal - platformFee;
 
     const { ownerEmail } = await this.fetchRestaurantOwner(cart.restaurantId);
 
     const order = await this.orderModel.create({
       customerId,
+      customerEmail,
       restaurantId: cart.restaurantId,
       restaurantName: cart.restaurantName,
       ownerEmail,
@@ -104,7 +123,12 @@ export class OrderService {
       deliveryAddress: dto.deliveryAddress,
       subtotal,
       deliveryFee: DELIVERY_FEE,
+      discountAmount,
+      promoCode: appliedPromoCode,
       total,
+      platformFee,
+      restaurantEarnings,
+      platformFeePercent: this.platformFeePercent,
       notes: dto.notes,
       status: OrderStatus.PENDING,
     });
@@ -116,6 +140,9 @@ export class OrderService {
     // Fire-and-forget: WebSocket + email (don't block the response)
     this.orderGateway.emitNewOrder(cart.restaurantId, sanitizeOrder(placed));
     this.mailService.sendNewOrderToOwner(placed).catch(() => null);
+    if (appliedPromoCode) {
+      this.promoCodeService.recordUsage(appliedPromoCode).catch(() => null);
+    }
 
     return sanitizeOrder(placed) as Order;
   }
@@ -165,9 +192,13 @@ export class OrderService {
       (o.paymentStatus === 'PAID') ||
       (o.paymentMethod === 'COD' && o.status === 'DELIVERED');
 
-    const totalRevenue   = orders.filter(earned).reduce((s, o) => s + o.total, 0);
-    const cardRevenue    = orders.filter(o => o.paymentStatus === 'PAID').reduce((s, o) => s + o.total, 0);
-    const codRevenue     = orders.filter(o => o.paymentMethod === 'COD' && o.status === 'DELIVERED').reduce((s, o) => s + o.total, 0);
+    // Use restaurantEarnings (after commission) — fall back to total for legacy orders
+    const earnings = (o: any) => o.restaurantEarnings ?? o.total;
+
+    const totalRevenue   = orders.filter(earned).reduce((s, o) => s + earnings(o), 0);
+    const totalPlatformFees = orders.filter(earned).reduce((s, o: any) => s + (o.platformFee ?? 0), 0);
+    const cardRevenue    = orders.filter(o => o.paymentStatus === 'PAID').reduce((s, o) => s + earnings(o), 0);
+    const codRevenue     = orders.filter(o => o.paymentMethod === 'COD' && o.status === 'DELIVERED').reduce((s, o) => s + earnings(o), 0);
     const totalOrders    = orders.filter(o => o.status !== 'CANCELLED').length;
     const deliveredCount = orders.filter(o => o.status === 'DELIVERED').length;
     const pendingCount   = orders.filter(o => ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'PICKED_UP'].includes(o.status)).length;
@@ -184,7 +215,7 @@ export class OrderService {
         const created = new Date(o.createdAt).toISOString().slice(0, 10);
         return created === dateStr && earned(o);
       });
-      daily.push({ date: dateStr, revenue: dayOrders.reduce((s, o) => s + o.total, 0), orders: dayOrders.length });
+      daily.push({ date: dateStr, revenue: dayOrders.reduce((s, o) => s + earnings(o), 0), orders: dayOrders.length });
     }
 
     // Top 5 items by quantity sold
@@ -201,7 +232,7 @@ export class OrderService {
       .sort((a, b) => b.quantity - a.quantity)
       .slice(0, 5);
 
-    return { totalRevenue, cardRevenue, codRevenue, totalOrders, deliveredCount, pendingCount, avgOrderValue, daily, topItems };
+    return { totalRevenue, totalPlatformFees, cardRevenue, codRevenue, totalOrders, deliveredCount, pendingCount, avgOrderValue, daily, topItems };
   }
 
   async updateStatus(orderId: string, requesterId: string, role: string, dto: UpdateStatusDto): Promise<Order> {
@@ -225,6 +256,15 @@ export class OrderService {
     // Fire-and-forget Stripe refund — if it fails the order is still cancelled
     if (next === OrderStatus.CANCELLED) {
       this.paymentService.refundOrder(orderId).catch(() => null);
+    }
+
+    // Fire-and-forget customer status email
+    const NOTIFY_STATUSES = [
+      OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.READY,
+      OrderStatus.PICKED_UP, OrderStatus.DELIVERED, OrderStatus.CANCELLED,
+    ];
+    if (NOTIFY_STATUSES.includes(next)) {
+      this.mailService.sendOrderStatusToCustomer(updated as any, next).catch(() => null);
     }
 
     return sanitizeOrder(updated) as unknown as Order;
@@ -267,5 +307,71 @@ export class OrderService {
     if (role === 'admin') return;
 
     throw new ForbiddenException('Access denied');
+  }
+
+  async getAdminAnalytics(role: string) {
+    if (role !== 'admin') throw new ForbiddenException('Access denied');
+
+    const orders = await this.orderModel.find().lean() as any[];
+
+    const earned = (o: any) =>
+      o.paymentStatus === 'PAID' ||
+      (o.paymentMethod === 'COD' && o.status === 'DELIVERED');
+
+    const earnedOrders = orders.filter(earned);
+
+    const totalOrders       = orders.length;
+    const totalGrossRevenue = earnedOrders.reduce((s, o) => s + (o.total ?? 0), 0);
+    const totalPlatformFees = earnedOrders.reduce((s, o) => s + (o.platformFee ?? 0), 0);
+    const totalRestaurantPayouts = earnedOrders.reduce((s, o) => s + (o.restaurantEarnings ?? o.subtotal ?? 0), 0);
+
+    // Status breakdown
+    const byStatus: Record<string, number> = {};
+    for (const o of orders) {
+      byStatus[o.status] = (byStatus[o.status] ?? 0) + 1;
+    }
+
+    // Daily — last 30 days
+    const now = new Date();
+    const daily: { date: string; revenue: number; orders: number; fees: number }[] = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().slice(0, 10);
+      const dayOrders = orders.filter(o => {
+        const created = new Date(o.createdAt).toISOString().slice(0, 10);
+        return created === dateStr && earned(o);
+      });
+      daily.push({
+        date: dateStr,
+        revenue: dayOrders.reduce((s, o) => s + (o.total ?? 0), 0),
+        fees: dayOrders.reduce((s, o) => s + (o.platformFee ?? 0), 0),
+        orders: dayOrders.length,
+      });
+    }
+
+    // Top 10 restaurants by gross revenue
+    const restaurantMap = new Map<string, { name: string; orders: number; revenue: number; fees: number }>();
+    for (const o of earnedOrders) {
+      const entry = restaurantMap.get(o.restaurantId) ?? { name: o.restaurantName, orders: 0, revenue: 0, fees: 0 };
+      entry.orders  += 1;
+      entry.revenue += o.total ?? 0;
+      entry.fees    += o.platformFee ?? 0;
+      restaurantMap.set(o.restaurantId, entry);
+    }
+    const topRestaurants = [...restaurantMap.entries()]
+      .map(([id, v]) => ({ restaurantId: id, ...v }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 10);
+
+    return {
+      totalOrders,
+      totalGrossRevenue,
+      totalPlatformFees,
+      totalRestaurantPayouts,
+      byStatus,
+      daily,
+      topRestaurants,
+    };
   }
 }

@@ -146,6 +146,22 @@ export default async function DashboardPage() {
           )}
 
           {isAdmin && (
+            <Link href="/dashboard/admin/analytics"
+              className="group relative overflow-hidden rounded-2xl p-6 flex items-center gap-5 hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
+              style={{ background: 'linear-gradient(135deg, #f5f3ff, #ede9fe)' }}>
+              <div className="absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-300" style={{ background: 'radial-gradient(circle at 70% 50%, #7c3aed, transparent)' }} />
+              <div className="w-14 h-14 rounded-2xl bg-violet-600 flex items-center justify-center text-3xl flex-shrink-0 group-hover:scale-110 transition-transform duration-300 shadow-lg shadow-violet-200">📊</div>
+              <div>
+                <p className="font-black text-lg text-gray-900 leading-tight">Analytics</p>
+                <p className="text-violet-400 text-sm mt-0.5">Revenue, fees & top restaurants</p>
+              </div>
+              <svg className="w-5 h-5 text-violet-300 ml-auto flex-shrink-0 group-hover:text-violet-500 group-hover:translate-x-1 transition-all duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" d="M9 5l7 7-7 7"/>
+              </svg>
+            </Link>
+          )}
+
+          {isAdmin && (
             <Link href="/dashboard/admin"
               className="group relative overflow-hidden rounded-2xl p-6 flex items-center gap-5 hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
               style={{ background: 'linear-gradient(135deg, #faf5ff, #ede9fe)' }}>

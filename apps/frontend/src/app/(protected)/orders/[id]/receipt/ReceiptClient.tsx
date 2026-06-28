@@ -104,11 +104,34 @@ export default function ReceiptClient({ order }: { order: Order }) {
               <span>Delivery fee</span>
               <span className="font-semibold">₨{order.deliveryFee.toFixed(0)}</span>
             </div>
+            {order.promoCode && order.discountAmount !== undefined && order.discountAmount > 0 && (
+              <div className="flex justify-between text-sm text-green-600">
+                <span className="flex items-center gap-1">
+                  🎟️ <span className="font-mono font-bold">{order.promoCode}</span>
+                </span>
+                <span className="font-bold">−₨{order.discountAmount.toFixed(0)}</span>
+              </div>
+            )}
             <div className="flex justify-between text-base font-black text-orange-600 pt-1 border-t border-dashed border-gray-200">
               <span>Total</span>
               <span>₨{order.total.toFixed(0)}</span>
             </div>
           </div>
+
+          {/* Commission breakdown — visible when data exists */}
+          {order.platformFee !== undefined && order.platformFee > 0 && (
+            <div className="border-t border-dashed border-gray-200 pt-4 space-y-1.5">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Earnings Breakdown</p>
+              <div className="flex justify-between text-sm text-gray-500">
+                <span>Platform fee ({order.platformFeePercent ?? 10}%)</span>
+                <span className="font-semibold text-red-500">−₨{order.platformFee.toFixed(0)}</span>
+              </div>
+              <div className="flex justify-between text-sm font-black text-green-600">
+                <span>Restaurant earnings</span>
+                <span>₨{order.restaurantEarnings?.toFixed(0)}</span>
+              </div>
+            </div>
+          )}
 
           {/* Payment */}
           <div className="border-t border-dashed border-gray-200 pt-4 grid grid-cols-2 gap-y-2 text-sm">

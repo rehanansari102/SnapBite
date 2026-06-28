@@ -569,7 +569,12 @@ export interface Order {
   deliveryAddress: DeliveryAddress
   subtotal: number
   deliveryFee: number
+  discountAmount?: number
+  promoCode?: string
   total: number
+  platformFee?: number
+  restaurantEarnings?: number
+  platformFeePercent?: number
   status: OrderStatus
   paymentMethod?: PaymentMethod
   paymentStatus?: PaymentStatus
@@ -636,6 +641,7 @@ export async function apiClearCart(accessToken: string): Promise<void> {
 export async function apiPlaceOrder(accessToken: string, payload: {
   deliveryAddress: DeliveryAddress
   notes?: string
+  promoCode?: string
 }): Promise<Order> {
   const res = await gatewayFetch('/api/orders', {
     method: 'POST',
@@ -647,6 +653,69 @@ export async function apiPlaceOrder(accessToken: string, payload: {
     throw new Error(body?.message ?? 'Failed to place order')
   }
   return res.json()
+}
+
+export type PromoCode = {
+  _id: string
+  code: string
+  type: 'PERCENT' | 'FLAT'
+  value: number
+  minOrderValue: number
+  maxUses?: number
+  usedCount: number
+  expiresAt?: string
+  isActive: boolean
+  restaurantId?: string
+  description?: string
+  createdAt: string
+}
+
+export async function apiValidatePromo(
+  accessToken: string, code: string, subtotal: number
+): Promise<{ discountAmount: number; promoCode: string }> {
+  const res = await gatewayFetch(
+    `/api/orders/promos/validate?code=${encodeURIComponent(code)}&subtotal=${subtotal}`,
+    { method: 'GET', headers: { Authorization: `Bearer ${accessToken}` } as never }
+  )
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body?.message ?? 'Invalid promo code')
+  }
+  return res.json()
+}
+
+export async function apiGetPromos(accessToken: string): Promise<PromoCode[]> {
+  const res = await gatewayFetch('/api/orders/promos', {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${accessToken}` } as never,
+  })
+  if (!res.ok) throw new Error('Failed to fetch promo codes')
+  return res.json()
+}
+
+export async function apiCreatePromo(accessToken: string, dto: {
+  code: string; type: 'PERCENT' | 'FLAT'; value: number
+  minOrderValue?: number; maxUses?: number; expiresAt?: string
+  restaurantId?: string; description?: string
+}): Promise<PromoCode> {
+  const res = await gatewayFetch('/api/orders/promos', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}` } as never,
+    body: JSON.stringify(dto),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body?.message ?? 'Failed to create promo code')
+  }
+  return res.json()
+}
+
+export async function apiDeactivatePromo(accessToken: string, id: string): Promise<void> {
+  const res = await gatewayFetch(`/api/orders/promos/${id}/deactivate`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${accessToken}` } as never,
+  })
+  if (!res.ok) throw new Error('Failed to deactivate promo code')
 }
 
 export async function apiGetMyOrders(accessToken: string): Promise<Order[]> {
@@ -678,6 +747,7 @@ export async function apiGetRestaurantOrders(accessToken: string, restaurantId: 
 
 export type EarningsData = {
   totalRevenue: number
+  totalPlatformFees: number
   cardRevenue: number
   codRevenue: number
   totalOrders: number
@@ -686,6 +756,25 @@ export type EarningsData = {
   avgOrderValue: number
   daily: { date: string; revenue: number; orders: number }[]
   topItems: { name: string; quantity: number; revenue: number }[]
+}
+
+export type AdminAnalytics = {
+  totalOrders: number
+  totalGrossRevenue: number
+  totalPlatformFees: number
+  totalRestaurantPayouts: number
+  byStatus: Record<string, number>
+  daily: { date: string; revenue: number; orders: number; fees: number }[]
+  topRestaurants: { restaurantId: string; name: string; orders: number; revenue: number; fees: number }[]
+}
+
+export async function apiGetAdminAnalytics(accessToken: string): Promise<AdminAnalytics> {
+  const res = await gatewayFetch('/api/orders/admin/analytics', {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${accessToken}` } as never,
+  })
+  if (!res.ok) throw new Error('Failed to fetch analytics')
+  return res.json()
 }
 
 export async function apiGetRestaurantEarnings(accessToken: string, restaurantId: string): Promise<EarningsData> {

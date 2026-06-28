@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
-import { placeOrder } from '@/app/actions/order'
+import { placeOrder, validatePromo } from '@/app/actions/order'
 import type { Cart, UserAddress } from '@/app/lib/api'
 
 const PaymentClient = dynamic(() => import('./PaymentClient'), { ssr: false })
@@ -29,8 +29,30 @@ export default function CheckoutClient({
   const [manualAddress, setManualAddress] = useState({ street: '', city: '', country: 'PK' })
   const useManual = addresses.length === 0
 
+  const [promoInput, setPromoInput] = useState('')
+  const [appliedPromo, setAppliedPromo] = useState<{ code: string; discount: number } | null>(null)
+  const [promoError, setPromoError] = useState('')
+  const [promoLoading, setPromoLoading] = useState(false)
+
   const deliveryFee = 30
-  const total = cart.subtotal + deliveryFee
+  const discount = appliedPromo?.discount ?? 0
+  const total = cart.subtotal + deliveryFee - discount
+
+  async function handleApplyPromo() {
+    if (!promoInput.trim()) return
+    setPromoError('')
+    setPromoLoading(true)
+    try {
+      const result = await validatePromo(promoInput.trim(), cart.subtotal)
+      setAppliedPromo({ code: result.promoCode, discount: result.discountAmount })
+      setPromoInput('')
+    } catch (err) {
+      setPromoError(err instanceof Error ? err.message : 'Invalid promo code')
+      setAppliedPromo(null)
+    } finally {
+      setPromoLoading(false)
+    }
+  }
 
   function getAddress() {
     return useManual
@@ -54,7 +76,7 @@ export default function CheckoutClient({
           country: address.country,
           lat: 'lat' in address ? (address.lat as number | undefined) : undefined,
           lng: 'lng' in address ? (address.lng as number | undefined) : undefined,
-        }, notes || undefined)
+        }, notes || undefined, appliedPromo?.code)
 
         if (paymentMethod === 'cod') {
           router.push(`/orders/${order._id}`)
@@ -145,6 +167,14 @@ export default function CheckoutClient({
         <div className="border-t border-orange-100 pt-3 space-y-1.5 text-sm text-gray-600">
           <div className="flex justify-between"><span>Subtotal</span><span className="font-semibold">₨{cart.subtotal.toFixed(0)}</span></div>
           <div className="flex justify-between"><span>Delivery fee</span><span className="font-semibold">₨{deliveryFee}</span></div>
+          {appliedPromo && (
+            <div className="flex justify-between text-green-600">
+              <span className="flex items-center gap-1">
+                🎟️ <span className="font-mono font-bold">{appliedPromo.code}</span>
+              </span>
+              <span className="font-bold">−₨{appliedPromo.discount.toFixed(0)}</span>
+            </div>
+          )}
           <div className="flex justify-between font-black text-orange-600 text-base pt-1">
             <span>Total</span><span>₨{total.toFixed(0)}</span>
           </div>
@@ -181,6 +211,48 @@ export default function CheckoutClient({
             </div>
           </label>
         </div>
+      </div>
+
+      {/* Promo Code */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
+        <h2 className="font-extrabold text-gray-900">🎟️ Promo Code</h2>
+        {appliedPromo ? (
+          <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+            <div>
+              <p className="font-mono font-bold text-green-700 text-sm">{appliedPromo.code}</p>
+              <p className="text-xs text-green-600 mt-0.5">Saving ₨{appliedPromo.discount.toFixed(0)}</p>
+            </div>
+            <button
+              onClick={() => setAppliedPromo(null)}
+              className="text-xs text-red-400 hover:text-red-600 font-semibold transition-colors"
+            >
+              Remove
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={promoInput}
+                onChange={e => { setPromoInput(e.target.value.toUpperCase()); setPromoError('') }}
+                onKeyDown={e => e.key === 'Enter' && handleApplyPromo()}
+                placeholder="Enter promo code"
+                className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-mono uppercase focus:outline-none focus:border-orange-400"
+              />
+              <button
+                onClick={handleApplyPromo}
+                disabled={promoLoading || !promoInput.trim()}
+                className="px-4 py-2.5 rounded-xl text-sm font-bold text-white bg-orange-500 hover:bg-orange-600 disabled:opacity-50 transition-colors"
+              >
+                {promoLoading ? '…' : 'Apply'}
+              </button>
+            </div>
+            {promoError && (
+              <p className="text-xs text-red-500 font-medium">{promoError}</p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Notes */}

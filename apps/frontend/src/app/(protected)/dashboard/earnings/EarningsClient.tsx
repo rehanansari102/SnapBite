@@ -178,7 +178,7 @@ export default function EarningsClient({ restaurants }: { restaurants: Restauran
           {/* Summary cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard
-              label="Total Revenue"
+              label="Your Earnings"
               value={fmt(data.totalRevenue)}
               sub={`${data.deliveredCount} delivered`}
               gradient="bg-gradient-to-br from-orange-500 to-orange-400"
@@ -199,11 +199,11 @@ export default function EarningsClient({ restaurants }: { restaurants: Restauran
               icon={<svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>}
             />
             <StatCard
-              label="Avg Order Value"
-              value={fmt(data.avgOrderValue)}
-              sub={`${data.pendingCount} active now`}
-              gradient="bg-gradient-to-br from-purple-500 to-purple-400"
-              icon={<svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>}
+              label="Platform Fee (10%)"
+              value={fmt(data.totalPlatformFees ?? 0)}
+              sub="SnapBite commission"
+              gradient="bg-gradient-to-br from-red-400 to-red-500"
+              icon={<svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 2.5 2 2.5-2 2.5 2 2.5-2L19 21z"/></svg>}
             />
           </div>
 

@@ -14,4 +14,5 @@ export class PlaceOrderDto {
   deliveryAddress: DeliveryAddressDto;
 
   @IsOptional() @IsString() notes?: string;
+  @IsOptional() @IsString() promoCode?: string;
 }

@@ -5,7 +5,7 @@ import {
   TransactionalEmailsApiApiKeys,
   SendSmtpEmail,
 } from '@getbrevo/brevo';
-import { Order } from './schemas/order.schema';
+import { Order, OrderStatus } from './schemas/order.schema';
 
 @Injectable()
 export class MailService {
@@ -111,6 +111,91 @@ export class MailService {
       this.logger.log(`New order email sent to owner ${order.ownerEmail} for order ${order._id}`);
     } catch (err) {
       this.logger.error(`Failed to send new order email for ${order._id}`, err);
+    }
+  }
+
+  async sendOrderStatusToCustomer(
+    order: Order & { _id: string; customerEmail?: string },
+    status: OrderStatus,
+  ): Promise<void> {
+    if (!order.customerEmail) return;
+
+    const orderId = String(order._id).slice(-8).toUpperCase();
+
+    const STATUS_META: Partial<Record<OrderStatus, { emoji: string; headline: string; body: string; color: string }>> = {
+      [OrderStatus.CONFIRMED]: {
+        emoji: '✅', color: '#16a34a',
+        headline: 'Order Confirmed!',
+        body: `Great news! <strong>${order.restaurantName}</strong> has accepted your order and will start preparing it shortly.`,
+      },
+      [OrderStatus.PREPARING]: {
+        emoji: '👨‍🍳', color: '#ea580c',
+        headline: 'Being Prepared',
+        body: `The kitchen at <strong>${order.restaurantName}</strong> is now preparing your food. Hang tight!`,
+      },
+      [OrderStatus.READY]: {
+        emoji: '🛍️', color: '#7c3aed',
+        headline: 'Order Ready!',
+        body: `Your order from <strong>${order.restaurantName}</strong> is packed and ready to go.`,
+      },
+      [OrderStatus.PICKED_UP]: {
+        emoji: '🛵', color: '#2563eb',
+        headline: 'On Its Way!',
+        body: `Your order from <strong>${order.restaurantName}</strong> has been picked up and is heading to you.`,
+      },
+      [OrderStatus.DELIVERED]: {
+        emoji: '🎉', color: '#16a34a',
+        headline: 'Delivered!',
+        body: `Your order from <strong>${order.restaurantName}</strong> has been delivered. Enjoy your meal!`,
+      },
+      [OrderStatus.CANCELLED]: {
+        emoji: '❌', color: '#dc2626',
+        headline: 'Order Cancelled',
+        body: `Your order from <strong>${order.restaurantName}</strong> has been cancelled.${order.cancelReason ? ` Reason: ${order.cancelReason}` : ''}`,
+      },
+    };
+
+    const meta = STATUS_META[status];
+    if (!meta) return;
+
+    const email = new SendSmtpEmail();
+    email.sender = { name: this.fromName, email: this.fromEmail };
+    email.to = [{ email: order.customerEmail }];
+    email.subject = `${meta.emoji} Order #${orderId} — ${meta.headline}`;
+    email.htmlContent = `
+      <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:32px;background:#fff;">
+        <div style="text-align:center;margin-bottom:28px;">
+          <span style="font-size:48px;">${meta.emoji}</span>
+          <h1 style="color:#f97316;margin:8px 0 0;">SnapBite</h1>
+        </div>
+
+        <div style="background:#f9fafb;border-left:4px solid ${meta.color};padding:16px 20px;border-radius:8px;margin-bottom:24px;">
+          <h2 style="color:#111827;margin:0 0 6px;">${meta.headline}</h2>
+          <p style="color:#6b7280;margin:0;font-size:14px;">Order <strong>#${orderId}</strong></p>
+        </div>
+
+        <p style="color:#374151;font-size:15px;line-height:1.6;margin-bottom:24px;">${meta.body}</p>
+
+        <div style="background:#fff7ed;padding:14px 20px;border-radius:8px;margin-bottom:24px;">
+          <p style="margin:0 0 4px;font-weight:bold;color:#c2410c;font-size:13px;">📦 Order Summary</p>
+          <p style="margin:0;color:#374151;font-size:14px;">
+            ${order.items.map(i => `${i.name} ×${i.quantity}`).join(' · ')}
+          </p>
+          <p style="margin:6px 0 0;color:#f97316;font-weight:900;font-size:16px;">Total: ₨${order.total.toFixed(0)}</p>
+        </div>
+
+        <hr style="border:none;border-top:1px solid #f3f4f6;margin:24px 0;" />
+        <p style="color:#d1d5db;font-size:12px;text-align:center;">
+          © ${new Date().getFullYear()} SnapBite. All rights reserved.
+        </p>
+      </div>
+    `;
+
+    try {
+      await this.api.sendTransacEmail(email);
+      this.logger.log(`Status email (${status}) sent to customer ${order.customerEmail} for order ${order._id}`);
+    } catch (err) {
+      this.logger.error(`Failed to send status email for order ${order._id}`, err);
     }
   }
 }
