@@ -7,6 +7,7 @@ import { CartService } from './cart.service';
 import { OrderGateway } from './order.gateway';
 import { MailService } from './mail.service';
 import { PaymentService } from './payment.service';
+import { PromoCodeService } from './promo-code.service';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -60,8 +61,9 @@ describe('OrderService', () => {
         { provide: getModelToken(Order.name), useValue: orderModel },
         { provide: CartService,     useValue: { getCart: jest.fn(), clearCart: jest.fn() } },
         { provide: OrderGateway,    useValue: { emitNewOrder: jest.fn() } },
-        { provide: MailService,     useValue: { sendNewOrderToOwner: jest.fn().mockResolvedValue(undefined) } },
-        { provide: PaymentService,  useValue: { refundOrder: jest.fn().mockResolvedValue(undefined) } },
+        { provide: MailService,     useValue: { sendNewOrderToOwner: jest.fn().mockResolvedValue(undefined), sendOrderStatusToCustomer: jest.fn().mockResolvedValue(undefined) } },
+        { provide: PaymentService,     useValue: { refundOrder: jest.fn().mockResolvedValue(undefined) } },
+        { provide: PromoCodeService,   useValue: { validate: jest.fn().mockResolvedValue({ discountAmount: 0, promoCode: '' }), recordUsage: jest.fn().mockResolvedValue(undefined) } },
       ],
     }).compile();
 
