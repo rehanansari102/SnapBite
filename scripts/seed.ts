@@ -71,10 +71,12 @@ const menuItemSchema = new mongoose.Schema({
 
 // ── Seed data ────────────────────────────────────────────────────────────────
 
-const OWNER_EMAIL = 'owner@snapbite.dev';
+const OWNER_EMAIL    = 'owner@snapbite.dev';
 const CUSTOMER_EMAIL = 'customer@snapbite.dev';
-const ADMIN_EMAIL = 'admin@snapbite.dev';
-const SEED_PASSWORD = 'Password123!';
+const ADMIN_EMAIL    = 'admin@snapbite.dev';
+const DRIVER1_EMAIL  = 'driver1@snapbite.dev';
+const DRIVER2_EMAIL  = 'driver2@snapbite.dev';
+const SEED_PASSWORD  = 'Password123!';
 
 const WEEKDAYS = [
   { day: 0, open: '10:00', close: '22:00', isClosed: false },
@@ -180,10 +182,23 @@ async function seed() {
     ON CONFLICT (email) DO NOTHING
   `, [ADMIN_EMAIL, passwordHash]);
 
+  // Upsert drivers
+  await queryRunner.query(`
+    INSERT INTO users (id, email, "passwordHash", role, "isActive", "isEmailVerified")
+    VALUES (gen_random_uuid(), $1, $2, 'driver', true, true)
+    ON CONFLICT (email) DO NOTHING
+  `, [DRIVER1_EMAIL, passwordHash]);
+
+  await queryRunner.query(`
+    INSERT INTO users (id, email, "passwordHash", role, "isActive", "isEmailVerified")
+    VALUES (gen_random_uuid(), $1, $2, 'driver', true, true)
+    ON CONFLICT (email) DO NOTHING
+  `, [DRIVER2_EMAIL, passwordHash]);
+
   const ownerRow = await queryRunner.query(`SELECT id FROM users WHERE email = $1`, [OWNER_EMAIL]);
   const ownerId: string = ownerRow[0].id;
 
-  console.log(`✅ PostgreSQL — owner: ${OWNER_EMAIL}, customer: ${CUSTOMER_EMAIL}, admin: ${ADMIN_EMAIL}`);
+  console.log(`✅ PostgreSQL — owner: ${OWNER_EMAIL}, customer: ${CUSTOMER_EMAIL}, admin: ${ADMIN_EMAIL}, drivers: ${DRIVER1_EMAIL}, ${DRIVER2_EMAIL}`);
   console.log(`   owner id: ${ownerId}\n`);
 
   await queryRunner.release();
@@ -223,6 +238,8 @@ async function seed() {
   console.log(`  Owner:    ${OWNER_EMAIL} / ${SEED_PASSWORD}`);
   console.log(`  Customer: ${CUSTOMER_EMAIL} / ${SEED_PASSWORD}`);
   console.log(`  Admin:    ${ADMIN_EMAIL} / ${SEED_PASSWORD}`);
+  console.log(`  Driver 1: ${DRIVER1_EMAIL} / ${SEED_PASSWORD}`);
+  console.log(`  Driver 2: ${DRIVER2_EMAIL} / ${SEED_PASSWORD}`);
 }
 
 seed().catch((err) => {

@@ -20,7 +20,6 @@ import { RefreshToken } from './auth/entities/refresh-token.entity';
         JWT_REFRESH_EXPIRES_IN:  Joi.string().default('7d'),
         BREVO_API_KEY:           Joi.string().required(),
         BREVO_FROM_EMAIL:        Joi.string().email().required(),
-        CLIENT_URL:              Joi.string().required(),
       }),
       validationOptions: { allowUnknown: true, abortEarly: false },
     }),

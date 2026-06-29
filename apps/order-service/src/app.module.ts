@@ -13,7 +13,6 @@ import { HealthModule } from './health/health.module';
         PORT:                    Joi.number().default(3005),
         MONGODB_URI:             Joi.string().required(),
         REDIS_URL:               Joi.string().required(),
-        JWT_SECRET:              Joi.string().required(),
         STRIPE_SECRET_KEY:       Joi.string().required(),
         STRIPE_WEBHOOK_SECRET:   Joi.string().required(),
         RESTAURANT_SERVICE_URL:  Joi.string().required(),

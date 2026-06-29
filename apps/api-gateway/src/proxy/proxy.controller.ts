@@ -37,7 +37,7 @@ export class ProxyController {
       res.status(503).json({ message: 'Service not configured' });
       return;
     }
-
+   
     // Rewrite /api/auth/register → /auth/register
     const downstreamPath = req.path.replace('/api', '');
     const url = `${target}${downstreamPath}${req.url.includes('?') ? '?' + req.url.split('?')[1] : ''}`;
@@ -45,10 +45,11 @@ export class ProxyController {
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 10_000);
-
+   
       const headers: Record<string, string> = {
         'content-type': req.headers['content-type'] ?? 'application/json',
       };
+     
       if (req.headers['authorization']) headers['authorization'] = req.headers['authorization'] as string;
       if (req.headers['cookie']) headers['cookie'] = req.headers['cookie'] as string;
 
@@ -57,28 +58,27 @@ export class ProxyController {
       if (user?.userId) headers['x-user-id'] = user.userId;
       if (user?.email) headers['x-user-email'] = user.email;
       if (user?.role) headers['x-user-role'] = user.role;
-
       // Stripe webhook requires the raw body for signature verification
       const isWebhook = req.path.endsWith('/stripe/webhook')
       const rawBuf = (req as Request & { rawBody?: Buffer }).rawBody
       const body = ['GET', 'HEAD'].includes(req.method)
-        ? undefined
-        : isWebhook && rawBuf
-        ? new Uint8Array(rawBuf)
-        : JSON.stringify(req.body)
-
+      ? undefined
+      : isWebhook && rawBuf
+      ? new Uint8Array(rawBuf)
+      : JSON.stringify(req.body)
+      
       if (isWebhook) {
         const stripeSig = req.headers['stripe-signature']
         if (stripeSig) headers['stripe-signature'] = stripeSig as string
       }
-
+      
       const fetchRes = await fetch(url, {
         method: req.method,
         headers,
         body,
         signal: controller.signal,
       });
-
+      
       clearTimeout(timeout);
 
       // Forward cookies from downstream response
@@ -91,6 +91,7 @@ export class ProxyController {
       const text = await fetchRes.text();
       res.send(text);
     } catch (err: unknown) {
+      console.error('Proxy error:', err);
       if (err instanceof Error && err.name === 'AbortError') {
         res.status(504).json({ message: 'Service timeout' });
       } else {
