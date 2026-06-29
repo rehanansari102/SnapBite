@@ -7,184 +7,149 @@ on:
     branches: [main]
 
 jobs:
+  # ── Order Service ────────────────────────────────────────────────────────────
   test-order-service:
-    name: Order Service — Unit Tests
+    name: Order Service — Type Check + Tests
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
-
       - uses: pnpm/action-setup@v4
-
+        with:
+          version: 9
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
+      - run: pnpm install --frozen-lockfile
       - name: Type check
         run: pnpm --filter @snapbite/order-service exec tsc --noEmit
-
-      - name: Run unit tests
+      - name: Unit tests
         run: pnpm --filter @snapbite/order-service test:ci
-
-      - name: Upload coverage
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: order-service-coverage
           path: apps/order-service/coverage/
 
-  type-check-frontend:
-    name: Frontend — Type Check
+  # ── Auth Service ─────────────────────────────────────────────────────────────
+  test-auth-service:
+    name: Auth Service — Type Check + Tests
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
-
       - uses: pnpm/action-setup@v4
-
+        with:
+          version: 9
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
+      - run: pnpm install --frozen-lockfile
       - name: Type check
-        run: pnpm --filter @snapbite/frontend exec tsc --noEmit
+        run: pnpm --filter @snapbite/auth-service exec tsc --noEmit
+      - name: Unit tests
+        run: pnpm --filter @snapbite/auth-service test:ci
 
-  type-check-restaurant-service:
+  # ── Menu Service ─────────────────────────────────────────────────────────────
+  test-menu-service:
+    name: Menu Service — Type Check + Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Type check
+        run: pnpm --filter @snapbite/menu-service exec tsc --noEmit
+      - name: Unit tests
+        run: pnpm --filter @snapbite/menu-service test:ci
+
+  # ── Media Service ────────────────────────────────────────────────────────────
+  test-media-service:
+    name: Media Service — Type Check + Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Type check
+        run: pnpm --filter @snapbite/media-service exec tsc --noEmit
+      - name: Unit tests
+        run: pnpm --filter @snapbite/media-service test:ci
+
+  # ── Restaurant Service ───────────────────────────────────────────────────────
+  typecheck-restaurant-service:
     name: Restaurant Service — Type Check
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
-
       - uses: pnpm/action-setup@v4
-
+        with:
+          version: 9
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
+      - run: pnpm install --frozen-lockfile
       - name: Type check
         run: pnpm --filter @snapbite/restaurant-service exec tsc --noEmit
 
-  type-check-api-gateway:
+  # ── API Gateway ───────────────────────────────────────────────────────────────
+  typecheck-api-gateway:
     name: API Gateway — Type Check
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
-
       - uses: pnpm/action-setup@v4
-
+        with:
+          version: 9
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
+      - run: pnpm install --frozen-lockfile
       - name: Type check
         run: pnpm --filter @snapbite/api-gateway exec tsc --noEmit
 
-  type-check-auth-service:
-    name: Auth Service — Type Check
+  # ── Frontend ──────────────────────────────────────────────────────────────────
+  typecheck-frontend:
+    name: Frontend — Type Check
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
-
       - uses: pnpm/action-setup@v4
-
+        with:
+          version: 9
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
+      - run: pnpm install --frozen-lockfile
       - name: Type check
-        run: pnpm --filter @snapbite/auth-service exec tsc --noEmit
+        run: pnpm --filter @snapbite/frontend exec tsc --noEmit
 
-      - name: Run unit tests
-        run: pnpm --filter @snapbite/auth-service test:ci
-
-  type-check-menu-service:
-    name: Menu Service — Type Check
+  # ── Gate — all checks must pass ───────────────────────────────────────────────
+  all-checks-pass:
+    name: All checks passed
     runs-on: ubuntu-latest
-
+    needs:
+      - test-order-service
+      - test-auth-service
+      - test-menu-service
+      - test-media-service
+      - typecheck-restaurant-service
+      - typecheck-api-gateway
+      - typecheck-frontend
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Type check
-        run: pnpm --filter @snapbite/menu-service exec tsc --noEmit
-
-      - name: Run unit tests
-        run: pnpm --filter @snapbite/menu-service test:ci
-
-  type-check-media-service:
-    name: Media Service — Type Check
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Type check
-        run: pnpm --filter @snapbite/media-service exec tsc --noEmit
-
-      - name: Run unit tests
-        run: pnpm --filter @snapbite/media-service test:ci
-
-  type-check-user-service:
-    name: User Service — Type Check
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Type check
-        run: pnpm --filter @snapbite/user-service exec tsc --noEmit
-
-      - name: Run unit tests
-        run: pnpm --filter @snapbite/user-service test:ci
+      - run: echo "All CI checks passed ✓"
