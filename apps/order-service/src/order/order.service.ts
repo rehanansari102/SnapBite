@@ -20,12 +20,11 @@ const CUSTOMER_TRANSITIONS: Partial<Record<OrderStatus, OrderStatus>> = {
   [OrderStatus.PENDING]: OrderStatus.CANCELLED,
 };
 
+// Restaurant owner stops at READY — driver handles the rest
 const RESTAURANT_TRANSITIONS: Partial<Record<OrderStatus, OrderStatus>> = {
   [OrderStatus.PENDING]: OrderStatus.CONFIRMED,
   [OrderStatus.CONFIRMED]: OrderStatus.PREPARING,
   [OrderStatus.PREPARING]: OrderStatus.READY,
-  [OrderStatus.READY]: OrderStatus.PICKED_UP,
-  [OrderStatus.PICKED_UP]: OrderStatus.DELIVERED,
 };
 
 const DRIVER_TRANSITIONS: Partial<Record<OrderStatus, OrderStatus>> = {
@@ -275,7 +274,7 @@ export class OrderService {
     next: OrderStatus,
     requesterId: string,
     role: string,
-    order: { customerId: string; restaurantId: string },
+    order: { customerId: string; restaurantId: string; driverId?: string },
   ) {
     if (role === 'customer' || order.customerId === requesterId) {
       if (CUSTOMER_TRANSITIONS[current] !== next) {
@@ -296,6 +295,9 @@ export class OrderService {
     }
 
     if (role === 'driver') {
+      if (order.driverId && order.driverId !== requesterId) {
+        throw new ForbiddenException('You are not assigned to this order');
+      }
       if (DRIVER_TRANSITIONS[current] !== next) {
         throw new BadRequestException(
           `Invalid status transition from ${current} to ${next}`,
@@ -373,5 +375,74 @@ export class OrderService {
       daily,
       topRestaurants,
     };
+  }
+
+  // ── Driver methods ───────────────────────────────────────────────────────────
+
+  async getAvailableDrivers(): Promise<{ id: string; email: string }[]> {
+    const authUrl = process.env.AUTH_SERVICE_URL;
+    if (!authUrl) return [];
+
+    // Fetch all active drivers from auth-service
+    let allDrivers: { id: string; email: string }[] = [];
+    try {
+      const res = await fetch(`${authUrl}/auth/internal/drivers`);
+      if (!res.ok) return [];
+      allDrivers = await res.json() as { id: string; email: string }[];
+    } catch {
+      return [];
+    }
+
+    // Filter out drivers who already have an active delivery
+    const busyDriverIds = await this.orderModel.distinct('driverId', {
+      driverId: { $exists: true, $ne: null },
+      status: { $in: [OrderStatus.READY, OrderStatus.PICKED_UP] },
+    });
+
+    return allDrivers.filter(d => !busyDriverIds.includes(d.id));
+  }
+
+  async assignDriver(orderId: string, driverId: string, driverEmail: string, requesterId: string, role: string): Promise<Order> {
+    const order = await this.orderModel.findById(orderId);
+    if (!order) throw new NotFoundException('Order not found');
+
+    if (order.status !== OrderStatus.READY) {
+      throw new BadRequestException('Can only assign a driver to a READY order');
+    }
+
+    // Admin or driver can assign freely; owner must own the restaurant
+    if (role !== 'admin' && role !== 'driver') {
+      await this.assertRestaurantOwner(order.restaurantId, requesterId, role);
+    }
+
+    const updated = await this.orderModel
+      .findByIdAndUpdate(orderId, { $set: { driverId, driverEmail } }, { new: true, lean: true })
+      .exec();
+
+    return sanitizeOrder(updated) as unknown as Order;
+  }
+
+  async getAvailableOrders(): Promise<Order[]> {
+    const orders = await this.orderModel
+      .find({ status: OrderStatus.READY, driverId: { $exists: false } })
+      .sort({ createdAt: 1 })
+      .lean();
+    return sanitizeOrders(orders) as unknown as Order[];
+  }
+
+  async getActiveDelivery(driverId: string): Promise<Order | null> {
+    const order = await this.orderModel
+      .findOne({ driverId, status: { $in: [OrderStatus.READY, OrderStatus.PICKED_UP] } })
+      .lean();
+    if (!order) return null;
+    return sanitizeOrder(order) as unknown as Order;
+  }
+
+  async getDriverHistory(driverId: string): Promise<Order[]> {
+    const orders = await this.orderModel
+      .find({ driverId, status: OrderStatus.DELIVERED })
+      .sort({ createdAt: -1 })
+      .lean();
+    return sanitizeOrders(orders) as unknown as Order[];
   }
 }

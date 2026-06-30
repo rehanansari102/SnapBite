@@ -282,6 +282,15 @@ export class AuthService {
     return { users, total, page, limit, pages: Math.ceil(total / limit) };
   }
 
+  async listDrivers(): Promise<{ id: string; email: string }[]> {
+    const drivers = await this.userRepo.find({
+      where: { role: UserRole.DRIVER, isActive: true },
+      select: ['id', 'email'],
+      order: { email: 'ASC' },
+    });
+    return drivers.map(d => ({ id: d.id, email: d.email }));
+  }
+
   async banUser(targetId: string, adminId: string) {
     if (targetId === adminId) throw new BadRequestException('Cannot ban yourself');
     const user = await this.userRepo.findOne({ where: { id: targetId } });

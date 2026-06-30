@@ -1,6 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
-import { IoAdapter } from '@nestjs/platform-socket.io';
+import { CorsIoAdapter } from './order/cors-io.adapter';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -10,7 +10,7 @@ async function bootstrap() {
     origin: process.env.CORS_ORIGIN ?? 'http://localhost:3000',
     credentials: true,
   });
-  app.useWebSocketAdapter(new IoAdapter(app));
+  app.useWebSocketAdapter(new CorsIoAdapter(app));
 
   const port = process.env.PORT ?? 3005;
   await app.listen(port);

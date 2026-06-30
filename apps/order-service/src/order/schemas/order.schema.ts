@@ -79,6 +79,9 @@ export class Order {
 
   @Prop() notes?: string;
   @Prop() cancelReason?: string;
+
+  @Prop({ index: true }) driverId?: string;
+  @Prop() driverEmail?: string;
 }
 
 export const OrderSchema = SchemaFactory.createForClass(Order);

@@ -160,6 +160,12 @@ export class AuthController {
     return this.authService.banUser(id, req.headers['x-user-id']);
   }
 
+  // Internal service-to-service endpoint — called by order-service to get driver list
+  @Get('internal/drivers')
+  listDrivers() {
+    return this.authService.listDrivers();
+  }
+
   // gRPC method — called by API Gateway to verify tokens
   @GrpcMethod('AuthService', 'VerifyToken')
   async verifyToken(data: { token: string }) {

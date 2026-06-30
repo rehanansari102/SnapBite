@@ -96,6 +96,73 @@ export class OrderController {
     return this.cartService.clearCart(req.headers['x-user-id']);
   }
 
+  // ── Driver ──────────────────────────────────────────────────
+
+  @Get('drivers/available')
+  getAvailableDrivers(@Req() req: AuthRequest) {
+    const role = req.headers['x-user-role'];
+    if (role !== 'restaurant_owner' && role !== 'admin') {
+      throw new ForbiddenException('Restaurant owners only');
+    }
+    return this.orderService.getAvailableDrivers();
+  }
+
+  @Get('driver/available')
+  getAvailableOrders(@Req() req: AuthRequest) {
+    if (req.headers['x-user-role'] !== 'driver') {
+      throw new ForbiddenException('Drivers only');
+    }
+    return this.orderService.getAvailableOrders();
+  }
+
+  @Get('driver/active')
+  async getActiveDelivery(@Req() req: AuthRequest) {
+    if (req.headers['x-user-role'] !== 'driver') {
+      throw new ForbiddenException('Drivers only');
+    }
+    const order = await this.orderService.getActiveDelivery(req.headers['x-user-id']);
+    return order ?? null;
+  }
+
+  @Get('driver/history')
+  getDriverHistory(@Req() req: AuthRequest) {
+    if (req.headers['x-user-role'] !== 'driver') {
+      throw new ForbiddenException('Drivers only');
+    }
+    return this.orderService.getDriverHistory(req.headers['x-user-id']);
+  }
+
+  @Patch(':id/assign-driver')
+  assignDriver(
+    @Req() req: AuthRequest,
+    @Param('id') id: string,
+    @Body() body: { driverId: string; driverEmail: string },
+  ) {
+    return this.orderService.assignDriver(
+      id,
+      body.driverId,
+      body.driverEmail,
+      req.headers['x-user-id'],
+      req.headers['x-user-role'],
+    );
+  }
+
+  @Patch(':id/accept')
+  acceptOrder(@Req() req: AuthRequest, @Param('id') id: string) {
+    if (req.headers['x-user-role'] !== 'driver') {
+      throw new ForbiddenException('Drivers only');
+    }
+    // Accept = driver self-assigns then marks PICKED_UP in one step
+    // Used only if marketplace mode (no prior assign-driver call)
+    return this.orderService.assignDriver(
+      id,
+      req.headers['x-user-id'],
+      req.headers['x-user-email'],
+      req.headers['x-user-id'],
+      req.headers['x-user-role'],
+    );
+  }
+
   // ── Orders ──────────────────────────────────────────────────
 
   @Post()
