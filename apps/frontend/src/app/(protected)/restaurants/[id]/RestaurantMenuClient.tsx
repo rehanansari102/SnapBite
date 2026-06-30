@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Restaurant, MenuItem } from '@/app/lib/api'
 import { addToCart } from '@/app/actions/cart'
+import { useCartStore } from '@/app/lib/store'
 
 interface Props {
   restaurant: Restaurant
@@ -15,7 +16,7 @@ export default function RestaurantMenuClient({ restaurant, menuItems }: Props) {
   const [isPending, startTransition] = useTransition()
   const [adding, setAdding] = useState<string | null>(null)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'conflict' } | null>(null)
-  const [cartCount, setCartCount] = useState(0)
+  const { count: cartCount, setCount: setCartCount } = useCartStore()
 
   const grouped = menuItems
     .filter(i => i.isAvailable)
@@ -43,7 +44,7 @@ export default function RestaurantMenuClient({ restaurant, menuItems }: Props) {
       })
       setAdding(null)
       if (result.success) {
-        setCartCount(result.cart?.items.reduce((s, i) => s + i.quantity, 0) ?? 0)
+        setCartCount(result.cart?.items.reduce((s, i) => s + i.quantity, 0) ?? cartCount)
         showToast(`${item.name} added to cart`, 'success')
       } else if (result.conflict) {
         showToast('Your cart has items from another restaurant. Go to cart to clear it first.', 'conflict')

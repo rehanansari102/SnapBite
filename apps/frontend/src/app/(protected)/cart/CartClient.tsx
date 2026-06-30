@@ -1,15 +1,23 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { updateCartItem, removeCartItem, clearCart } from '@/app/actions/order'
 import type { Cart } from '@/app/lib/api'
+import { useCartStore } from '@/app/lib/store'
+
+function cartItemCount(cart: Cart | null) {
+  return cart?.items.reduce((s, i) => s + i.quantity, 0) ?? 0
+}
 
 export default function CartClient({ initialCart }: { initialCart: Cart | null }) {
   const [cart, setCart] = useState<Cart | null>(initialCart)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
+  const setCount = useCartStore(s => s.setCount)
+
+  useEffect(() => { setCount(cartItemCount(cart)) }, [cart, setCount])
 
   function handleQuantity(menuItemId: string, delta: number, current: number) {
     const next = current + delta

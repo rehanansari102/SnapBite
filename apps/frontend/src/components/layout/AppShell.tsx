@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { logout } from '@/app/actions/auth'
 import ThemeToggle from '@/components/ThemeToggle'
+import { useCartStore } from '@/app/lib/store'
 
 const OwnerNotificationBell = dynamic(
   () => import('@/components/layout/OwnerNotificationBell'),
@@ -49,6 +50,18 @@ const OWNER_NAV_ITEMS: NavItem[] = [
   )},
 ]
 
+const DRIVER_NAV_ITEMS: NavItem[] = [
+  { label: 'Available Pickups', href: '/dashboard/driver/available', icon: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+  )},
+  { label: 'Active Delivery', href: '/dashboard/driver/active', icon: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+  )},
+  { label: 'Delivery History', href: '/dashboard/driver/history', icon: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+  )},
+]
+
 const ADMIN_NAV_ITEMS: NavItem[] = [
   { label: 'Admin Panel', href: '/dashboard/admin', exact: true, icon: (
     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
@@ -71,6 +84,7 @@ function initials(email: string) {
 function roleLabel(role: string) {
   if (role === 'restaurant_owner') return 'Restaurant Owner'
   if (role === 'admin') return 'Admin'
+  if (role === 'driver') return 'Driver'
   return 'Customer'
 }
 
@@ -111,9 +125,20 @@ export default function AppShell({ email, role, restaurantIds, adminPendingCount
   const profileRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
 
-  const isOwner = role === 'restaurant_owner' || role === 'admin'
+  const isOwner = role === 'restaurant_owner'
   const isAdmin = role === 'admin'
-  const allNav = [...NAV_ITEMS, ...(isOwner ? OWNER_NAV_ITEMS : []), ...(isAdmin ? ADMIN_NAV_ITEMS : [])]
+  const isDriver = role === 'driver'
+  const cartCount = useCartStore(s => s.count)
+
+  // Admin gets only admin nav — no customer items (My Orders / Cart are irrelevant)
+  // Driver gets only driver nav
+  // Owner gets customer + owner nav
+  // Customer gets customer nav only
+  const allNav = isDriver
+    ? DRIVER_NAV_ITEMS
+    : isAdmin
+    ? ADMIN_NAV_ITEMS
+    : [...NAV_ITEMS, ...(isOwner ? OWNER_NAV_ITEMS : [])]
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -241,12 +266,19 @@ export default function AppShell({ email, role, restaurantIds, adminPendingCount
             <OwnerNotificationBell restaurantIds={restaurantIds} />
           )}
 
-          {/* Cart quick link */}
-          <Link href="/cart" className="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/30 transition-colors">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>
-            </svg>
-          </Link>
+          {/* Cart quick link — hidden for drivers and admins */}
+          {!isDriver && !isAdmin && (
+            <Link href="/cart" className="relative p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/30 transition-colors">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>
+              </svg>
+              {cartCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] rounded-full bg-orange-500 text-white text-[10px] font-bold flex items-center justify-center px-1 shadow-md">
+                  {cartCount > 9 ? '9+' : cartCount}
+                </span>
+              )}
+            </Link>
+          )}
 
           {/* Profile */}
           <div className="relative" ref={profileRef}>

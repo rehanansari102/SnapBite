@@ -5,18 +5,13 @@ import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { io, Socket } from 'socket.io-client'
 import { getWsToken } from '@/app/actions/auth'
+import { useNotificationStore, type StoredNotification } from '@/app/lib/store'
 
 interface OrderNotification {
   _id: string
   restaurantName: string
   total: number
   items: { name: string; quantity: number }[]
-}
-
-interface StoredNotification extends OrderNotification {
-  id: number
-  read: boolean
-  receivedAt: string
 }
 
 const ORDER_SERVICE_WS = process.env.NEXT_PUBLIC_ORDER_SERVICE_WS ?? 'http://localhost:3005'
@@ -42,12 +37,11 @@ if (typeof window !== 'undefined') {
 }
 
 export default function OwnerNotificationBell({ restaurantIds }: { restaurantIds: string[] }) {
-  const [notifications, setNotifications] = useState<StoredNotification[]>([])
+  const { notifications, add, markAllRead, clear } = useNotificationStore()
   const [toasts, setToasts] = useState<StoredNotification[]>([])
   const [open, setOpen] = useState(false)
   const [wsToken, setWsToken] = useState<string | null>(null)
   const panelRef = useRef<HTMLDivElement>(null)
-  const counterRef = useRef(0)
 
   // Fetch the access token server-side so it can be passed to the socket
   // without needing to read the HttpOnly cookie from JavaScript directly.
@@ -83,11 +77,9 @@ export default function OwnerNotificationBell({ restaurantIds }: { restaurantIds
       )
 
       socket.on('new_order', (order: OrderNotification) => {
-        // Only play if the context was already unlocked by a prior user gesture
         const ctx = getAudioCtx()
         if (ctx && ctx.state === 'running') {
           try {
-            // Three-note ascending chime (C5 → E5 → G5), Fiverr-style
             const notes = [523.25, 659.25, 783.99]
             notes.forEach((freq, i) => {
               const osc = ctx.createOscillator()
@@ -106,19 +98,12 @@ export default function OwnerNotificationBell({ restaurantIds }: { restaurantIds
           } catch { /* ignore */ }
         }
 
-        const id = ++counterRef.current
-        const stored: StoredNotification = {
-          ...order,
-          id,
-          read: false,
-          receivedAt: new Date().toISOString(),
-        }
+        add(order)
 
-        setNotifications(prev => [stored, ...prev].slice(0, 20))
-
-        // Show toast — auto-dismiss after 8 s
+        // Toast uses store id — read it from the just-added first entry
+        const stored = useNotificationStore.getState().notifications[0]
         setToasts(prev => [...prev, stored])
-        setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 8000)
+        setTimeout(() => setToasts(prev => prev.filter(t => t.id !== stored.id)), 8000)
 
         window.dispatchEvent(new CustomEvent('snapbite:new-order', { detail: order }))
       })
@@ -133,9 +118,7 @@ export default function OwnerNotificationBell({ restaurantIds }: { restaurantIds
 
   function handleToggle() {
     setOpen(v => !v)
-    if (!open) {
-      setNotifications(prev => prev.map(n => ({ ...n, read: true })))
-    }
+    if (!open) markAllRead()
   }
 
   function dismissToast(id: number) {
@@ -216,7 +199,7 @@ export default function OwnerNotificationBell({ restaurantIds }: { restaurantIds
               <p className="text-sm font-bold text-white">Order Notifications</p>
               {notifications.length > 0 && (
                 <button
-                  onClick={() => setNotifications([])}
+                  onClick={clear}
                   className="text-[11px] text-orange-100 hover:text-white transition-colors"
                 >
                   Clear all
