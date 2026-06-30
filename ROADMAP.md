@@ -374,7 +374,7 @@ blacklist:{jti}              → "1"  (TTL = token expiry)
 - [x] Live map on order tracking page (OpenStreetMap iframe embed, no library/API key)
 - [x] Driver portal — `/dashboard/driver/{available,active,history}`
 - [x] GPS toggle state persisted across refresh (Zustand `persist`)
-- [ ] Estimated arrival countdown
+- [x] Estimated arrival — distance-based ETA from live driver position (haversine + avg speed)
 
 ---
 

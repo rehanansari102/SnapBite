@@ -49,6 +49,25 @@ const PAYMENT_BADGE: Record<NonNullable<PaymentStatus>, { label: string; cls: st
 
 const STEPS: OrderStatus[] = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'PICKED_UP', 'DELIVERED']
 
+// Rough ETA from the driver's live position. Straight-line distance at an
+// assumed average urban speed — approximate, not a routed estimate.
+const AVG_SPEED_KMH = 20
+
+function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const R = 6371
+  const toRad = (d: number) => (d * Math.PI) / 180
+  const dLat = toRad(b.lat - a.lat)
+  const dLng = toRad(b.lng - a.lng)
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2
+  return 2 * R * Math.asin(Math.sqrt(h))
+}
+
+function etaMinutes(distanceKm: number): number {
+  return Math.max(1, Math.round((distanceKm / AVG_SPEED_KMH) * 60))
+}
+
 export default function OrderDetailClient({ order: initial }: { order: Order }) {
   const [order, setOrder] = useState(initial)
   const [isPending, startTransition] = useTransition()
@@ -68,6 +87,14 @@ export default function OrderDetailClient({ order: initial }: { order: Order }) 
   // Live driver location tracking
   const [driverPos, setDriverPos] = useState<{ lat: number; lng: number } | null>(null)
   const socketRef = useRef<Socket | null>(null)
+
+  // Estimated arrival — only when we have both the driver's position and
+  // delivery coordinates (older/COD orders may lack coords).
+  const dest = order.deliveryAddress
+  const eta =
+    driverPos && dest.lat != null && dest.lng != null
+      ? etaMinutes(haversineKm(driverPos, { lat: dest.lat, lng: dest.lng }))
+      : null
 
   // One socket for the whole active lifecycle: live status pushes + driver
   // location. Replaces polling — on (re)connect we resync once to catch
@@ -235,6 +262,15 @@ export default function OrderDetailClient({ order: initial }: { order: Order }) 
               </a>
             )}
           </div>
+
+          {eta != null && (
+            <div className="px-5 py-2.5 bg-indigo-600 text-white flex items-center justify-center gap-2">
+              <span className="text-sm font-bold">
+                🛵 {eta <= 1 ? 'Arriving any moment' : `Arriving in ~${eta} min`}
+              </span>
+              <span className="text-[11px] text-indigo-200">· estimated</span>
+            </div>
+          )}
 
           {driverPos ? (
             <iframe
