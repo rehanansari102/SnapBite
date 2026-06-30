@@ -1,11 +1,15 @@
 'use client'
 
-import { useState, useTransition, useEffect } from 'react'
+import { useState, useTransition, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { io, type Socket } from 'socket.io-client'
 import { updateOrderStatus, getOrder } from '@/app/actions/order'
 import { reorder } from '@/app/actions/cart'
+import { getWsToken } from '@/app/actions/auth'
 import type { Order, OrderStatus, PaymentStatus } from '@/app/lib/api'
+
+const ORDER_SERVICE_WS = process.env.NEXT_PUBLIC_ORDER_SERVICE_WS ?? 'http://localhost:3005'
 
 const ACTIVE_STATUSES: OrderStatus[] = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'PICKED_UP']
 
@@ -59,6 +63,33 @@ export default function OrderDetailClient({ order: initial }: { order: Order }) 
   const currentStepIdx = STEPS.indexOf(order.status)
   const isCancelled = order.status === 'CANCELLED'
   const isActive = ACTIVE_STATUSES.includes(order.status)
+  const isBeingDelivered = order.status === 'PICKED_UP'
+
+  // Live driver location tracking
+  const [driverPos, setDriverPos] = useState<{ lat: number; lng: number } | null>(null)
+  const socketRef = useRef<Socket | null>(null)
+
+  useEffect(() => {
+    if (!isBeingDelivered) { setDriverPos(null); return }
+
+    let socket: Socket
+    getWsToken().then(token => {
+      socket = io(`${ORDER_SERVICE_WS}/orders`, {
+        query: { orderId: order._id },
+        auth: { token },
+        withCredentials: true,
+      })
+      socketRef.current = socket
+      socket.on('driver:location', (pos: { lat: number; lng: number }) => {
+        setDriverPos(pos)
+      })
+    })
+
+    return () => {
+      socket?.disconnect()
+      socketRef.current = null
+    }
+  }, [isBeingDelivered, order._id])
 
   // Auto-refresh every 15s while order is active
   useEffect(() => {
@@ -175,6 +206,51 @@ export default function OrderDetailClient({ order: initial }: { order: Order }) 
               </p>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Live driver tracking — only when PICKED_UP */}
+      {isBeingDelivered && (
+        <div className="rounded-2xl border border-indigo-100 shadow-sm overflow-hidden">
+          <div className="px-5 py-3 flex items-center justify-between" style={{ background: 'linear-gradient(135deg, #eef2ff, #fff)' }}>
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+              <p className="text-sm font-extrabold text-indigo-700">
+                {driverPos ? 'Driver location — live' : 'Waiting for driver location…'}
+              </p>
+            </div>
+            {driverPos && (
+              <a
+                href={`https://www.google.com/maps?q=${driverPos.lat},${driverPos.lng}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-semibold text-indigo-500 hover:text-indigo-700 transition-colors"
+              >
+                Open in Maps ↗
+              </a>
+            )}
+          </div>
+
+          {driverPos ? (
+            <iframe
+              key={`${driverPos.lat.toFixed(4)},${driverPos.lng.toFixed(4)}`}
+              title="Driver location"
+              width="100%"
+              height="260"
+              src={`https://www.openstreetmap.org/export/embed.html?bbox=${driverPos.lng - 0.008},${driverPos.lat - 0.008},${driverPos.lng + 0.008},${driverPos.lat + 0.008}&layer=mapnik&marker=${driverPos.lat},${driverPos.lng}`}
+              className="border-0 block"
+            />
+          ) : (
+            <div className="h-40 flex flex-col items-center justify-center gap-2 bg-indigo-50/50">
+              <span className="text-3xl animate-bounce">🛵</span>
+              <p className="text-xs text-indigo-400 font-medium">
+                {order.driverEmail
+                  ? `${order.driverEmail} is on the way`
+                  : 'Your driver is on the way'}
+              </p>
+              <p className="text-[11px] text-indigo-300">Map will appear once the driver shares location</p>
+            </div>
+          )}
         </div>
       )}
 

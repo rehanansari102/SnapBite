@@ -580,6 +580,8 @@ export interface Order {
   paymentStatus?: PaymentStatus
   notes?: string
   cancelReason?: string
+  driverId?: string
+  driverEmail?: string
   createdAt: string
   updatedAt: string
 }
@@ -835,6 +837,75 @@ export async function apiCreateReview(accessToken: string, restaurantId: string,
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
     throw new Error(body?.message ?? 'Failed to submit review')
+  }
+  return res.json()
+}
+
+// ── Driver ────────────────────────────────────────────────────────────────────
+
+export interface AvailableDriver {
+  id: string
+  email: string
+}
+
+export async function apiGetAvailableDrivers(accessToken: string): Promise<AvailableDriver[]> {
+  const res = await gatewayFetch('/api/orders/drivers/available', {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${accessToken}` } as never,
+  })
+  if (!res.ok) throw new Error('Failed to fetch available drivers')
+  return res.json()
+}
+
+export async function apiAssignDriver(accessToken: string, orderId: string, driverId: string, driverEmail: string): Promise<Order> {
+  const res = await gatewayFetch(`/api/orders/${orderId}/assign-driver`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${accessToken}` } as never,
+    body: JSON.stringify({ driverId, driverEmail }),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body?.message ?? 'Failed to assign driver')
+  }
+  return res.json()
+}
+
+export async function apiGetAvailableOrders(accessToken: string): Promise<Order[]> {
+  const res = await gatewayFetch('/api/orders/driver/available', {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${accessToken}` } as never,
+  })
+  if (!res.ok) throw new Error('Failed to fetch available orders')
+  return res.json()
+}
+
+export async function apiGetActiveDelivery(accessToken: string): Promise<Order | null> {
+  const res = await gatewayFetch('/api/orders/driver/active', {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${accessToken}` } as never,
+  })
+  if (res.status === 404) return null
+  if (!res.ok) throw new Error('Failed to fetch active delivery')
+  return res.json()
+}
+
+export async function apiGetDriverHistory(accessToken: string): Promise<Order[]> {
+  const res = await gatewayFetch('/api/orders/driver/history', {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${accessToken}` } as never,
+  })
+  if (!res.ok) throw new Error('Failed to fetch delivery history')
+  return res.json()
+}
+
+export async function apiAcceptOrder(accessToken: string, orderId: string): Promise<Order> {
+  const res = await gatewayFetch(`/api/orders/${orderId}/accept`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${accessToken}` } as never,
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body?.message ?? 'Failed to accept order')
   }
   return res.json()
 }

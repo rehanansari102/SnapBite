@@ -3,7 +3,8 @@
 import { useState, useTransition, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { getRestaurantOrders, updateOrderStatus } from '@/app/actions/order'
-import type { Order, OrderStatus, Restaurant } from '@/app/lib/api'
+import { getAvailableDrivers, assignDriver } from '@/app/actions/driver'
+import type { Order, OrderStatus, Restaurant, AvailableDriver } from '@/app/lib/api'
 
 const STATUS_LABEL: Record<OrderStatus, string> = {
   PENDING: 'Pending',
@@ -35,13 +36,12 @@ const STATUS_ICON: Record<OrderStatus, string> = {
   READY: '📦', PICKED_UP: '🛵', DELIVERED: '🎉', CANCELLED: '❌',
 }
 
-// Next valid statuses a restaurant owner can advance to
+// Next valid statuses a restaurant owner can advance to.
+// READY is the final owner action — driver takes over from there.
 const OWNER_NEXT: Partial<Record<OrderStatus, OrderStatus>> = {
   PENDING: 'CONFIRMED',
   CONFIRMED: 'PREPARING',
   PREPARING: 'READY',
-  READY: 'PICKED_UP',
-  PICKED_UP: 'DELIVERED',
 }
 
 const ACTIVE_STATUSES: OrderStatus[] = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'PICKED_UP']
@@ -57,6 +57,13 @@ export default function RestaurantOrdersClient({ restaurants }: { restaurants: R
   const [isPending, startTransition] = useTransition()
   const [filter, setFilter] = useState<'active' | 'all'>('active')
   const highlightRef = useRef<HTMLDivElement>(null)
+
+  // Driver assignment state
+  const [assigningOrderId, setAssigningOrderId] = useState<string | null>(null)
+  const [drivers, setDrivers] = useState<AvailableDriver[]>([])
+  const [driversLoading, setDriversLoading] = useState(false)
+  const [selectedDriverId, setSelectedDriverId] = useState('')
+  const [assignError, setAssignError] = useState('')
 
   // When arriving via notification link, show all orders and scroll to the target
   useEffect(() => {
@@ -101,6 +108,37 @@ export default function RestaurantOrdersClient({ restaurants }: { restaurants: R
     window.addEventListener('snapbite:new-order', handleNewOrder)
     return () => window.removeEventListener('snapbite:new-order', handleNewOrder)
   }, [selectedId, loadOrders])
+
+  async function openAssign(orderId: string) {
+    setAssigningOrderId(orderId)
+    setSelectedDriverId('')
+    setAssignError('')
+    setDriversLoading(true)
+    try {
+      const list = await getAvailableDrivers()
+      setDrivers(list)
+    } catch {
+      setAssignError('Could not load available drivers')
+    } finally {
+      setDriversLoading(false)
+    }
+  }
+
+  function handleAssignDriver(orderId: string) {
+    if (!selectedDriverId) return
+    const driver = drivers.find(d => d.id === selectedDriverId)
+    if (!driver) return
+    setAssignError('')
+    startTransition(async () => {
+      try {
+        const updated = await assignDriver(orderId, driver.id, driver.email)
+        setOrders(prev => prev.map(o => o._id === orderId ? updated : o))
+        setAssigningOrderId(null)
+      } catch (e) {
+        setAssignError(e instanceof Error ? e.message : 'Failed to assign driver')
+      }
+    })
+  }
 
   function handleAdvance(orderId: string, nextStatus: OrderStatus) {
     startTransition(async () => {
@@ -233,7 +271,7 @@ export default function RestaurantOrdersClient({ restaurants }: { restaurants: R
                   {/* Total + action */}
                   <div className="flex items-center justify-between border-t border-gray-50 pt-3">
                     <p className="font-black text-gray-900 text-lg">₨{order.total.toFixed(0)}</p>
-                    {nextStatus && (
+                    {nextStatus ? (
                       <button
                         onClick={() => handleAdvance(order._id, nextStatus)}
                         disabled={isPending}
@@ -241,8 +279,67 @@ export default function RestaurantOrdersClient({ restaurants }: { restaurants: R
                         style={{ background: 'linear-gradient(135deg, #ea580c, #f97316)' }}>
                         Mark as {STATUS_LABEL[nextStatus]} →
                       </button>
-                    )}
+                    ) : order.status === 'READY' && !order.driverId ? (
+                      <button
+                        onClick={() => openAssign(order._id)}
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-white shadow-md shadow-blue-200/60 transition-all hover:scale-[1.02]"
+                        style={{ background: 'linear-gradient(135deg, #2563eb, #3b82f6)' }}>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                        </svg>
+                        Assign Driver
+                      </button>
+                    ) : order.status === 'READY' && order.driverId ? (
+                      <span className="flex items-center gap-1.5 text-xs font-semibold text-green-700 bg-green-50 px-3 py-1.5 rounded-full border border-green-200">
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        {order.driverEmail ?? 'Driver assigned'}
+                      </span>
+                    ) : null}
                   </div>
+
+                  {/* Driver assignment panel */}
+                  {assigningOrderId === order._id && (
+                    <div className="mt-3 border-t border-gray-100 pt-3 space-y-3">
+                      <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Select a driver</p>
+                      {assignError && (
+                        <p className="text-xs text-red-600 font-medium">{assignError}</p>
+                      )}
+                      {driversLoading ? (
+                        <p className="text-xs text-gray-400">Loading drivers…</p>
+                      ) : drivers.length === 0 ? (
+                        <p className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
+                          No drivers available right now. Try again shortly.
+                        </p>
+                      ) : (
+                        <select
+                          value={selectedDriverId}
+                          onChange={e => setSelectedDriverId(e.target.value)}
+                          className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                        >
+                          <option value="">— Choose a driver —</option>
+                          {drivers.map(d => (
+                            <option key={d.id} value={d.id}>{d.email}</option>
+                          ))}
+                        </select>
+                      )}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleAssignDriver(order._id)}
+                          disabled={!selectedDriverId || isPending || driversLoading}
+                          className="flex-1 py-2 rounded-xl text-white text-sm font-bold disabled:opacity-50 transition-colors"
+                          style={{ background: 'linear-gradient(135deg, #2563eb, #3b82f6)' }}>
+                          {isPending ? 'Assigning…' : 'Confirm'}
+                        </button>
+                        <button
+                          onClick={() => setAssigningOrderId(null)}
+                          className="px-4 py-2 rounded-xl text-sm font-medium text-gray-500 bg-gray-100 hover:bg-gray-200 transition-colors">
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )
