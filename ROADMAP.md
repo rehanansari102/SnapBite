@@ -329,8 +329,8 @@ blacklist:{jti}              → "1"  (TTL = token expiry)
 - [x] Restaurant owner notification bell — live new order alerts via `restaurant:{id}` rooms
 - [x] CORS locked to `CORS_ORIGIN` env var (no wildcard)
 - [x] Token delivery via `getWsToken()` server action (bypasses HttpOnly cookie cross-port issue)
-- [ ] `order:{orderId}:status` — order status push → customer
-- [ ] `delivery:{orderId}:location` — driver GPS → customer map
+- [x] `driver:location` — driver GPS → customer map (relayed into `order:{orderId}` room)
+- [ ] `order:{orderId}:status` — order status push → customer (still 15s polling)
 
 **Email**
 - [x] New order email to restaurant owner via Brevo on every placed order
@@ -351,24 +351,30 @@ blacklist:{jti}              → "1"  (TTL = token expiry)
 
 ---
 
-### Phase 5 — Delivery & Real-time Tracking ❌
-**Delivery Service (`:3007`, MongoDB)**
-- [ ] Driver registration and profile
+### Phase 5 — Delivery & Real-time Tracking 🔄
+> Built inside Order Service (`:3005`) rather than a separate Delivery Service,
+> mirroring how Payments were folded into Order Service.
+
+**Driver / delivery features (Order Service)**
+- [x] Assign driver to order — `assignDriver` (admin/driver assign freely; owner must own restaurant)
+- [x] Driver accepts/rejects job — available pickups list + accept
+- [x] Driver location updates — browser `watchPosition` → WebSocket `driver:location`
+- [x] Driver list endpoint — `GET /auth/internal/drivers` (auth-service, seeded drivers)
 - [ ] Driver online/offline toggle
-- [ ] Assign driver to order (event-triggered from order.ready)
-- [ ] Driver accepts/rejects job
-- [ ] Driver location updates (GPS polling)
-- [ ] Delivery status + driver location endpoint
+- [ ] Driver self-registration and profile (drivers currently created via seed only)
 
 **WebSocket Gateway**
-- [ ] `order:{orderId}:status` — order status → customer
-- [ ] `delivery:{orderId}:location` — driver GPS → customer map
-- [ ] `restaurant:new-order` — new order alert → owner dashboard
+- [x] `driver:location` — driver GPS → customer map (role-stamped socket, relayed into `order:{orderId}` room)
+- [x] `restaurant:new-order` — new order alert → owner dashboard
+- [x] `CorsIoAdapter` — reads `CORS_ORIGIN` at runtime (decorator read env before ConfigModule loaded)
+- [x] HS256 JWT auth stamps `client.data.role`; relay guarded by `role === 'driver'`
+- [ ] `order:{orderId}:status` — order status → customer (still 15s polling)
 
 **Frontend**
-- [ ] Live map on order tracking page (Leaflet / Google Maps)
+- [x] Live map on order tracking page (OpenStreetMap iframe embed, no library/API key)
+- [x] Driver portal — `/dashboard/driver/{available,active,history}`
+- [x] GPS toggle state persisted across refresh (Zustand `persist`)
 - [ ] Estimated arrival countdown
-- [ ] Driver portal: `/driver/dashboard`, `/driver/delivery/:id`, `/driver/earnings`
 
 ---
 
