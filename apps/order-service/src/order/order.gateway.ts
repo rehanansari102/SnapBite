@@ -132,4 +132,11 @@ export class OrderGateway implements OnGatewayConnection, OnGatewayDisconnect {
   emitNewOrder(restaurantId: string, order: unknown) {
     this.server.to(`restaurant:${restaurantId}`).emit('new_order', order);
   }
+
+  emitOrderStatus(
+    orderId: string,
+    payload: { status: string; paymentStatus?: string; cancelReason?: string },
+  ) {
+    this.server.to(`order:${orderId}`).emit('order:status', payload);
+  }
 }

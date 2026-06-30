@@ -69,8 +69,11 @@ export default function OrderDetailClient({ order: initial }: { order: Order }) 
   const [driverPos, setDriverPos] = useState<{ lat: number; lng: number } | null>(null)
   const socketRef = useRef<Socket | null>(null)
 
+  // One socket for the whole active lifecycle: live status pushes + driver
+  // location. Replaces polling — on (re)connect we resync once to catch
+  // anything missed while offline.
   useEffect(() => {
-    if (!isBeingDelivered) { setDriverPos(null); return }
+    if (!isActive) { setDriverPos(null); return }
 
     let socket: Socket
     getWsToken().then(token => {
@@ -80,6 +83,20 @@ export default function OrderDetailClient({ order: initial }: { order: Order }) 
         withCredentials: true,
       })
       socketRef.current = socket
+
+      socket.on('connect', async () => {
+        try { setOrder(await getOrder(order._id)) } catch { /* keep current */ }
+      })
+
+      socket.on('order:status', (p: { status: OrderStatus; paymentStatus?: PaymentStatus; cancelReason?: string }) => {
+        setOrder(prev => ({
+          ...prev,
+          status: p.status,
+          ...(p.paymentStatus ? { paymentStatus: p.paymentStatus } : {}),
+          ...(p.cancelReason ? { cancelReason: p.cancelReason } : {}),
+        }))
+      })
+
       socket.on('driver:location', (pos: { lat: number; lng: number }) => {
         setDriverPos(pos)
       })
@@ -89,19 +106,7 @@ export default function OrderDetailClient({ order: initial }: { order: Order }) 
       socket?.disconnect()
       socketRef.current = null
     }
-  }, [isBeingDelivered, order._id])
-
-  // Auto-refresh every 15s while order is active
-  useEffect(() => {
-    if (!isActive) return
-    const interval = setInterval(async () => {
-      try {
-        const updated = await getOrder(order._id)
-        setOrder(updated)
-      } catch { /* silent */ }
-    }, 15_000)
-    return () => clearInterval(interval)
-  }, [order._id, isActive])
+  }, [isActive, order._id])
 
   async function handleReorder() {
     setReordering(true)

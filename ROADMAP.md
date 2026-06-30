@@ -330,7 +330,7 @@ blacklist:{jti}              → "1"  (TTL = token expiry)
 - [x] CORS locked to `CORS_ORIGIN` env var (no wildcard)
 - [x] Token delivery via `getWsToken()` server action (bypasses HttpOnly cookie cross-port issue)
 - [x] `driver:location` — driver GPS → customer map (relayed into `order:{orderId}` room)
-- [ ] `order:{orderId}:status` — order status push → customer (still 15s polling)
+- [x] `order:status` — order status push → customer (replaces 15s polling; resync on reconnect)
 
 **Email**
 - [x] New order email to restaurant owner via Brevo on every placed order
@@ -368,7 +368,7 @@ blacklist:{jti}              → "1"  (TTL = token expiry)
 - [x] `restaurant:new-order` — new order alert → owner dashboard
 - [x] `CorsIoAdapter` — reads `CORS_ORIGIN` at runtime (decorator read env before ConfigModule loaded)
 - [x] HS256 JWT auth stamps `client.data.role`; relay guarded by `role === 'driver'`
-- [ ] `order:{orderId}:status` — order status → customer (still 15s polling)
+- [x] `order:status` — live status push → customer (replaces 15s polling; resync on reconnect)
 
 **Frontend**
 - [x] Live map on order tracking page (OpenStreetMap iframe embed, no library/API key)

@@ -252,6 +252,13 @@ export class OrderService {
       .findByIdAndUpdate(orderId, { $set: update }, { new: true, lean: true })
       .exec();
 
+    // Live status push → customer tracking page (order:{id} room)
+    this.orderGateway.emitOrderStatus(orderId, {
+      status: next,
+      paymentStatus: (updated as any)?.paymentStatus,
+      cancelReason: (updated as any)?.cancelReason,
+    });
+
     // Fire-and-forget Stripe refund — if it fails the order is still cancelled
     if (next === OrderStatus.CANCELLED) {
       this.paymentService.refundOrder(orderId).catch(() => null);
