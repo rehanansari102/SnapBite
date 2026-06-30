@@ -160,6 +160,23 @@ export class AuthController {
     return this.authService.banUser(id, req.headers['x-user-id']);
   }
 
+  // ── Driver availability (online/offline) ──────────────────────────────────
+  @Get('driver/availability')
+  getDriverAvailability(@Req() req: Request & { headers: Record<string, string> }) {
+    if (req.headers['x-user-role'] !== 'driver') throw new ForbiddenException('Drivers only');
+    return this.authService.getDriverAvailability(req.headers['x-user-id']);
+  }
+
+  @Patch('driver/availability')
+  @HttpCode(HttpStatus.OK)
+  setDriverAvailability(
+    @Req() req: Request & { headers: Record<string, string> },
+    @Body() body: { isAvailable: boolean },
+  ) {
+    if (req.headers['x-user-role'] !== 'driver') throw new ForbiddenException('Drivers only');
+    return this.authService.setDriverAvailability(req.headers['x-user-id'], Boolean(body.isAvailable));
+  }
+
   // Internal service-to-service endpoint — called by order-service to get driver list
   @Get('internal/drivers')
   listDrivers() {

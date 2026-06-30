@@ -360,7 +360,7 @@ blacklist:{jti}              → "1"  (TTL = token expiry)
 - [x] Driver accepts/rejects job — available pickups list + accept
 - [x] Driver location updates — browser `watchPosition` → WebSocket `driver:location`
 - [x] Driver list endpoint — `GET /auth/internal/drivers` (auth-service, seeded drivers)
-- [ ] Driver online/offline toggle
+- [x] Driver online/offline toggle — `isAvailable` on auth user; only online drivers are assignable
 - [ ] Driver self-registration and profile (drivers currently created via seed only)
 
 **WebSocket Gateway**

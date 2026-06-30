@@ -41,6 +41,10 @@ export class User {
   @Column({ default: false })
   isEmailVerified: boolean;
 
+  // Driver availability — only meaningful for role=driver. Drivers start offline.
+  @Column({ default: false })
+  isAvailable: boolean;
+
   @Index()
   @Column({ nullable: true, type: 'varchar' })
   emailVerificationToken: string | null;

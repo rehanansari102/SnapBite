@@ -9,6 +9,8 @@ import {
   apiUpdateOrderStatus,
   apiGetAvailableDrivers,
   apiAssignDriver,
+  apiGetDriverAvailability,
+  apiSetDriverAvailability,
   type OrderStatus,
 } from '@/app/lib/api'
 
@@ -52,4 +54,16 @@ export async function assignDriver(orderId: string, driverId: string, driverEmai
   const token = await getAccessToken()
   if (!token) throw new Error('Not authenticated')
   return apiAssignDriver(token, orderId, driverId, driverEmail)
+}
+
+export async function getDriverAvailability() {
+  const token = await getAccessToken()
+  if (!token) throw new Error('Not authenticated')
+  return apiGetDriverAvailability(token)
+}
+
+export async function setDriverAvailability(isAvailable: boolean) {
+  const token = await getAccessToken()
+  if (!token) throw new Error('Not authenticated')
+  return apiSetDriverAvailability(token, isAvailable)
 }

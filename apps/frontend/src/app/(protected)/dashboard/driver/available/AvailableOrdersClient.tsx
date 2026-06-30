@@ -2,18 +2,27 @@
 
 import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { getAvailableOrders, acceptOrder } from '@/app/actions/driver'
+import { getAvailableOrders, acceptOrder, setDriverAvailability } from '@/app/actions/driver'
 import type { Order } from '@/app/lib/api'
 
-export default function AvailableOrdersClient({ initialOrders }: { initialOrders: Order[] }) {
+export default function AvailableOrdersClient({
+  initialOrders,
+  initialAvailable,
+}: {
+  initialOrders: Order[]
+  initialAvailable: boolean
+}) {
   const [orders, setOrders] = useState<Order[]>(initialOrders)
   const [accepting, setAccepting] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const [isOnline, setIsOnline] = useState(initialAvailable)
+  const [togglingAvail, setTogglingAvail] = useState(false)
   const router = useRouter()
 
-  // Auto-refresh every 30s
+  // Auto-refresh every 30s — only while online
   useEffect(() => {
+    if (!isOnline) return
     const interval = setInterval(() => {
       startTransition(async () => {
         const fresh = await getAvailableOrders().catch(() => null)
@@ -21,7 +30,26 @@ export default function AvailableOrdersClient({ initialOrders }: { initialOrders
       })
     }, 30_000)
     return () => clearInterval(interval)
-  }, [])
+  }, [isOnline])
+
+  async function toggleAvailability() {
+    setError(null)
+    const next = !isOnline
+    setTogglingAvail(true)
+    try {
+      const res = await setDriverAvailability(next)
+      setIsOnline(res.isAvailable)
+      if (res.isAvailable) {
+        // Just came online — pull a fresh list immediately
+        const fresh = await getAvailableOrders().catch(() => null)
+        if (fresh) setOrders(fresh)
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to update availability')
+    } finally {
+      setTogglingAvail(false)
+    }
+  }
 
   async function handleAccept(orderId: string) {
     setError(null)
@@ -48,7 +76,7 @@ export default function AvailableOrdersClient({ initialOrders }: { initialOrders
             const fresh = await getAvailableOrders().catch(() => null)
             if (fresh) setOrders(fresh)
           })}
-          disabled={isPending}
+          disabled={isPending || !isOnline}
           className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 disabled:opacity-50 transition-colors"
         >
           <svg className={`w-4 h-4 ${isPending ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -58,13 +86,46 @@ export default function AvailableOrdersClient({ initialOrders }: { initialOrders
         </button>
       </div>
 
+      {/* Availability toggle */}
+      <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm px-5 py-4 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <span className={`w-2.5 h-2.5 rounded-full ${isOnline ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'}`} />
+          <div>
+            <p className="text-sm font-bold text-gray-800 dark:text-gray-200">
+              {isOnline ? "You're online" : "You're offline"}
+            </p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {isOnline ? 'Restaurants can assign deliveries to you' : 'Go online to receive and accept deliveries'}
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={toggleAvailability}
+          disabled={togglingAvail}
+          aria-pressed={isOnline}
+          className={`relative inline-flex h-6 w-11 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none disabled:opacity-50 ${
+            isOnline ? 'bg-green-500' : 'bg-gray-200 dark:bg-gray-600'
+          }`}
+        >
+          <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-200 ${isOnline ? 'translate-x-5' : 'translate-x-0'}`} />
+        </button>
+      </div>
+
       {error && (
         <div className="rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-700 font-medium">
           {error}
         </div>
       )}
 
-      {orders.length === 0 ? (
+      {!isOnline ? (
+        <div className="flex flex-col items-center justify-center py-20 gap-3 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-gray-100 dark:bg-white/10 flex items-center justify-center text-3xl">
+            😴
+          </div>
+          <p className="font-bold text-gray-700 dark:text-gray-300">You&apos;re offline</p>
+          <p className="text-sm text-gray-400">Flip the switch above to go online and see available pickups</p>
+        </div>
+      ) : orders.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 gap-3 text-center">
           <div className="w-16 h-16 rounded-2xl bg-gray-100 dark:bg-white/10 flex items-center justify-center text-3xl">
             🛵

@@ -3,6 +3,7 @@ import {
   ConflictException,
   UnauthorizedException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -283,12 +284,29 @@ export class AuthService {
   }
 
   async listDrivers(): Promise<{ id: string; email: string }[]> {
+    // Only drivers who are currently online are assignable
     const drivers = await this.userRepo.find({
-      where: { role: UserRole.DRIVER, isActive: true },
+      where: { role: UserRole.DRIVER, isActive: true, isAvailable: true },
       select: ['id', 'email'],
       order: { email: 'ASC' },
     });
     return drivers.map(d => ({ id: d.id, email: d.email }));
+  }
+
+  async getDriverAvailability(userId: string): Promise<{ isAvailable: boolean }> {
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user) throw new BadRequestException('User not found');
+    if (user.role !== UserRole.DRIVER) throw new ForbiddenException('Drivers only');
+    return { isAvailable: user.isAvailable };
+  }
+
+  async setDriverAvailability(userId: string, isAvailable: boolean): Promise<{ isAvailable: boolean }> {
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user) throw new BadRequestException('User not found');
+    if (user.role !== UserRole.DRIVER) throw new ForbiddenException('Drivers only');
+    user.isAvailable = isAvailable;
+    await this.userRepo.save(user);
+    return { isAvailable: user.isAvailable };
   }
 
   async banUser(targetId: string, adminId: string) {

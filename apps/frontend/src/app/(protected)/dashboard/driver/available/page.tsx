@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { getAvailableOrders } from '@/app/actions/driver'
+import { getAvailableOrders, getDriverAvailability } from '@/app/actions/driver'
 import AvailableOrdersClient from './AvailableOrdersClient'
 
 export const metadata = { title: 'Available Pickups — SnapBite Driver' }
@@ -13,7 +13,10 @@ export default async function AvailableOrdersPage() {
   const payload = JSON.parse(Buffer.from(base64, 'base64').toString('utf-8'))
   if (payload.role !== 'driver') redirect('/dashboard')
 
-  const orders = await getAvailableOrders().catch(() => [])
+  const [orders, availability] = await Promise.all([
+    getAvailableOrders().catch(() => []),
+    getDriverAvailability().catch(() => ({ isAvailable: false })),
+  ])
 
-  return <AvailableOrdersClient initialOrders={orders} />
+  return <AvailableOrdersClient initialOrders={orders} initialAvailable={availability.isAvailable} />
 }

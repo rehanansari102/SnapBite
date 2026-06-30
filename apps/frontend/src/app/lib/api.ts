@@ -910,6 +910,28 @@ export async function apiAcceptOrder(accessToken: string, orderId: string): Prom
   return res.json()
 }
 
+export async function apiGetDriverAvailability(accessToken: string): Promise<{ isAvailable: boolean }> {
+  const res = await gatewayFetch('/api/auth/driver/availability', {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${accessToken}` } as never,
+  })
+  if (!res.ok) throw new Error('Failed to fetch availability')
+  return res.json()
+}
+
+export async function apiSetDriverAvailability(accessToken: string, isAvailable: boolean): Promise<{ isAvailable: boolean }> {
+  const res = await gatewayFetch('/api/auth/driver/availability', {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${accessToken}` } as never,
+    body: JSON.stringify({ isAvailable }),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body?.message ?? 'Failed to update availability')
+  }
+  return res.json()
+}
+
 // ── Media ─────────────────────────────────────────────────────────────────────
 
 export type MediaFolder = 'avatars' | 'restaurants' | 'menus'
